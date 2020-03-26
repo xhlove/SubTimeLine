@@ -1,7 +1,7 @@
 '''
 @作者: weimo
 @创建日期: 2020-03-19 21:51:13
-@上次编辑时间: 2020-03-26 15:24:30
+@上次编辑时间: 2020-03-26 15:38:08
 @一个人的命运啊,当然要靠自我奋斗,但是...
 '''
 
@@ -329,45 +329,6 @@ class Worker(object):
                             break
         print(f"耗时统计 -> {abs(sst.offset_base - offset_init)}帧 {time.time() - ts:.2f}s")
         # cv2.waitKey(0)
-            # #下面的方案已废弃
-            # #<----检查是不是边界---->
-            # if boxes == "no subtitle":
-            #     if last_status.end - offset == 1:
-            #         start_frame = last_status.frame
-            #         cv2.imwrite(f"frames/{last_status.offset}_start.jpg", base_frame)
-            #         break
-            #     else:
-            #         last_status.start = offset
-            #         offset = (offset + last_status.end) // 2
-            # else:
-            #     print(f"{offset} has subtitle {similarity}")
-            #     if similarity > 50:
-            #         last_status.end = offset
-            #         offset = offset - self.step
-            #         # offset = (last_status.start + offset) // 2
-            #     else:
-            #         if last_status.end - offset == 1:
-            #             # 记录时间起点
-            #             start_frame = last_status.frame
-            #             # 这样写是以字幕第一帧保存的 可能保存base_frame会好些
-            #             cv2.imwrite(f"frames/{last_status.offset}_start.jpg", base_frame)
-            #             print(f"break after {offset} and last offset is {last_status.offset}")
-            #             break
-            #         else:
-            #             # cv2.imwrite(f"frames/{offset}_error.jpg", frame)
-            #             # cv2.imwrite(f"frames/{offset}_error_color.jpg", _frame)
-            #             # print(f"查找字幕首帧失败 第{offset}帧和模板{base_frame_offset}不匹配")
-            #             last_status.start = offset
-            #             offset = (offset + last_status.end) // 2
-                        # break
-
-            #<----set last status in the end---->
-            # if boxes == "no subtitle":
-            #     last_status.has_subtitle = False
-            # else:
-            #     last_status.has_subtitle = True
-            # last_status.frame = frame
-            # last_status.offset = offset_bak
 
 if __name__ == "__main__":
     # work()
