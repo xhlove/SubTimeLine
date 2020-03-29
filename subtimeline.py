@@ -1,14 +1,13 @@
 '''
 @作者: weimo
 @创建日期: 2020-03-19 21:51:13
-@上次编辑时间: 2020-03-29 09:26:37
+@上次编辑时间: 2020-03-29 10:51:12
 @一个人的命运啊,当然要靠自我奋斗,但是...
 '''
 
 # 寻找字幕
 # 通过
 from pathlib import Path
-
 
 import cv2
 import sys
@@ -50,14 +49,14 @@ def check_subtitle(frame: np.ndarray, _inrange_params: tuple, frame_index: int, 
     hmin, hmax, smin, smax, vmin, vmax = _inrange_params
     img_hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
     img_inrange = cv2.inRange(img_hsv, np.array([hmin, smin, vmin]), np.array([hmax, smax, vmax]))
-    img_inrange = remove_large_white_area(img_inrange)
+    img_inrange = remove_large_white_area(img_inrange, 10, 10)
     # 转灰度图并提取边缘，最后取反
     img_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     img_gray_gaus_canny = cv2.Canny(img_gray, 90, 240)
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 1))
+    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
     img_close = cv2.bitwise_not(cv2.morphologyEx(img_gray_gaus_canny, cv2.MORPH_CLOSE, kernel))
     # 对前面的结果与运算并轻微腐蚀
-    img_no_border = cv2.dilate(img_inrange & img_close, cv2.getStructuringElement(cv2.MORPH_RECT, (1, 1)))
+    img_no_border = cv2.dilate(img_inrange & img_close, cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2)))
     # test_remove_large_white_area(img_no_border)
     # 通过MSER定位字幕
     # if frame_index == 3278:
@@ -67,9 +66,8 @@ def check_subtitle(frame: np.ndarray, _inrange_params: tuple, frame_index: int, 
     #     cv2.imshow("img_close", img_close)
     #     cv2.imshow("img_no_border", img_no_border)
         # cv2.waitKey(0)
-    height, width, channels = frame.shape # 注意这里的frame是彩色的
-    box, box_area = get_mser(img_no_border, frame_index, float(width / 2), isbase=isbase)
-    return box, box_area, img_no_border
+    box, box_area = get_mser(img_inrange, frame_index, frame.shape, isbase=isbase)
+    return box, box_area, img_inrange
 
 def log_calc_infos(text: str):
     log_path = Path("out.ass").absolute()
@@ -134,6 +132,8 @@ class Worker(object):
         #<----先找到有字幕的帧---->
         seek_flag = False
         while True:
+            if offset > self.video_frames:
+                break
             self.vc.set(cv2.CAP_PROP_POS_FRAMES, offset)
             retval, frame = self.vc.read()
             if retval is False:
@@ -174,12 +174,15 @@ class Worker(object):
                 sst = SubStorage()
                 seek_flag = False
                 cut_x, cut_y, cut_w, cut_h = self.cbox
+        print(f"耗时{time.time() - ts:.2f}s")
 
     def seek_end(self, offset: int, cut_area: list, sst: SubStorage, ts: float, inrange_params: list):
         cut_x, cut_y, cut_w, cut_h = cut_area
         offset = offset + self.step
         find_offset_end = False
         while True:
+            if offset > self.video_frames:
+                break
             self.vc.set(cv2.CAP_PROP_POS_FRAMES, offset)
             retval, frame = self.vc.read()
             _frame = frame
@@ -240,6 +243,8 @@ class Worker(object):
         offset = offset - self.step
         find_offset_start = False
         while True:
+            if offset > self.video_frames:
+                break
             #<----read frame and get mser boxes---->
             self.vc.set(cv2.CAP_PROP_POS_FRAMES, offset)
             retval, frame = self.vc.read()
@@ -307,9 +312,21 @@ class Worker(object):
         # print(f"耗时统计 -> {abs(sst.offset_base - offset_init)}帧 {time.time() - ts:.2f}s")
         # cv2.waitKey(0)
 
+def get_params(video_path: Path, offset: int, cbox: list, inrange_params: list = None):
+    from util.get_params import only_subtitle
+    vc = cv2.VideoCapture(str(video_path))
+    if vc.isOpened() is False:
+        sys.exit(f"Can not open {video_path.name} !")
+    vc.set(cv2.CAP_PROP_POS_FRAMES, offset)
+    retval, frame = vc.read()
+    x, y, w, h = cbox
+    img = only_subtitle(frame[y:y+h, x:x+w], inrange_params=inrange_params, just_return=True)
+    test_remove_large_white_area(img)
+
 if __name__ == "__main__":
     # work()
-    video_path = Path(r"demo.mp4")
+    video_path = Path(r"tests\images\demo.mp4")
+    # get_params(video_path, 2663, [0, 960, 1920, 60], inrange_params=[0, 190, 0, 50, 220, 244])
     inrange_params = {
         "0:25300": [0, 190, 0, 30, 180, 255],
         "2530:30038": [0, 190, 0, 50, 220, 244],
