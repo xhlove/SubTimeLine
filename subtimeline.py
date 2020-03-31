@@ -1,7 +1,7 @@
 '''
 @作者: weimo
 @创建日期: 2020-03-19 21:51:13
-@上次编辑时间: 2020-03-29 10:51:12
+@上次编辑时间: 2020-03-31 01:17:30
 @一个人的命运啊,当然要靠自我奋斗,但是...
 '''
 
@@ -47,9 +47,11 @@ def test_remove_large_white_area(img: np.ndarray, _erode: int = 10, _dilate: int
 def check_subtitle(frame: np.ndarray, _inrange_params: tuple, frame_index: int, isbase: bool = False):
     # 指定参数做inRange
     hmin, hmax, smin, smax, vmin, vmax = _inrange_params
-    img_hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    # img_hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    img_hsv = cv2.cvtColor(cv2.GaussianBlur(frame, (3, 3), 0), cv2.COLOR_BGR2HSV)
     img_inrange = cv2.inRange(img_hsv, np.array([hmin, smin, vmin]), np.array([hmax, smax, vmax]))
     img_inrange = remove_large_white_area(img_inrange, 10, 10)
+    # img_inrange = remove_large_white_area(img_inrange, 3, 3)
     # 转灰度图并提取边缘，最后取反
     img_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     img_gray_gaus_canny = cv2.Canny(img_gray, 90, 240)
@@ -59,18 +61,18 @@ def check_subtitle(frame: np.ndarray, _inrange_params: tuple, frame_index: int, 
     img_no_border = cv2.dilate(img_inrange & img_close, cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2)))
     # test_remove_large_white_area(img_no_border)
     # 通过MSER定位字幕
-    # if frame_index == 3278:
+    # if frame_index == 3489:
     #     cv2.imshow("img_hsv", img_hsv)
     #     cv2.imshow("img_inrange", img_inrange)
     #     cv2.imshow("img_gray", img_gray)
     #     cv2.imshow("img_close", img_close)
     #     cv2.imshow("img_no_border", img_no_border)
         # cv2.waitKey(0)
-    box, box_area = get_mser(img_inrange, frame_index, frame.shape, isbase=isbase)
+    box, box_area = get_mser(img_no_border, frame_index, frame.shape, isbase=isbase)
     return box, box_area, img_inrange
 
 def log_calc_infos(text: str):
-    log_path = Path("out.ass").absolute()
+    log_path = Path(r"tests\out.ass").absolute()
     with open(log_path.__str__(), "a+", encoding="utf-8") as f:
         f.write(text + "\n")
 
@@ -313,23 +315,26 @@ class Worker(object):
         # cv2.waitKey(0)
 
 def get_params(video_path: Path, offset: int, cbox: list, inrange_params: list = None):
-    from util.get_params import only_subtitle
+    from util.get_params import only_subtitle, get_canny
     vc = cv2.VideoCapture(str(video_path))
     if vc.isOpened() is False:
         sys.exit(f"Can not open {video_path.name} !")
     vc.set(cv2.CAP_PROP_POS_FRAMES, offset)
     retval, frame = vc.read()
     x, y, w, h = cbox
-    img = only_subtitle(frame[y:y+h, x:x+w], inrange_params=inrange_params, just_return=True)
-    test_remove_large_white_area(img)
+    # img = get_canny(frame[y:y+h, x:x+w])
+    img = only_subtitle(frame[y:y+h, x:x+w], inrange_params=inrange_params, just_return=False)
+    # test_remove_large_white_area(img)
 
 if __name__ == "__main__":
     # work()
     video_path = Path(r"tests\images\demo.mp4")
-    # get_params(video_path, 2663, [0, 960, 1920, 60], inrange_params=[0, 190, 0, 50, 220, 244])
+    # get_params(video_path, 15337, [0, 960, 1920, 60], inrange_params=[0, 190, 0, 50, 220, 244])
+    # get_params(video_path, 6345, [0, 960, 1920, 60], inrange_params=[0, 180, 0, 15, 180, 244])
     inrange_params = {
         "0:25300": [0, 190, 0, 30, 180, 255],
-        "2530:30038": [0, 190, 0, 50, 220, 244],
+        # "2530:30038": [0, 190, 0, 50, 220, 244],
+        "2530:30038": [0, 180, 0, 15, 180, 244],
     }
     cbox = [0, 960, 1920, 60] # x y w h 
     worker = Worker(video_path, inrange_params, cbox)

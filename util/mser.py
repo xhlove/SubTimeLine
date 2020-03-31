@@ -1,7 +1,7 @@
 '''
 @作者: weimo
 @创建日期: 2020-03-26 19:17:52
-@上次编辑时间: 2020-03-29 10:19:46
+@上次编辑时间: 2020-03-31 00:42:47
 @一个人的命运啊,当然要靠自我奋斗,但是...
 '''
 import cv2
@@ -53,14 +53,14 @@ def get_mser(img: np.ndarray, frame_index: int, shape: tuple, min_area=300, isba
     half_width = width / 2
     box_area = 0
     mser = cv2.MSER_create(_min_area=min_area)
-    img = cv2.dilate(img, cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3)))
+    # img = cv2.dilate(img, cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3)))
     regions, bboxes = mser.detectRegions(img)
-    # if frame_index == 9144:
-    #     img_bak = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
-    #     for x, y, w, h in bboxes:
-    #         cv2.rectangle(img_bak, (x, y), (x + w, y + h), (255, 255, 0), 2)
-    #     cv2.imshow(f"{frame_index}_img_mser_color", img_bak)
-    #     cv2.waitKey(0)
+    if frame_index == 19688:
+        img_bak = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
+        for x, y, w, h in bboxes:
+            cv2.rectangle(img_bak, (x, y), (x + w, y + h), (255, 255, 0), 2)
+        cv2.imshow(f"{frame_index}_img_mser_color", img_bak)
+        cv2.waitKey(0)
     if bboxes.__len__() == 0:
         print(f"{frame_index} box is zero before filter box")
         return "no subtitle", box_area
