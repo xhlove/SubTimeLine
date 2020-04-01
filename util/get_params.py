@@ -1,7 +1,7 @@
 '''
 @作者: weimo
 @创建日期: 2020-03-29 09:51:05
-@上次编辑时间: 2020-03-31 00:37:34
+@上次编辑时间: 2020-04-02 00:50:27
 @一个人的命运啊,当然要靠自我奋斗,但是...
 '''
 from pathlib import Path
@@ -16,7 +16,8 @@ def nothing(x):
 def only_subtitle(img: np.ndarray, inrange_params: list = None, just_return: bool = False):
     _hsv1 = cv2.cvtColor(cv2.GaussianBlur(img, (5, 5), 0), cv2.COLOR_BGR2HSV)
     _hsv2 = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-    _hsv = np.vstack((_hsv1, _hsv2))
+    _hsv = _hsv2
+    # _hsv = np.vstack((_hsv1, _hsv2))
 
     hmin, hmax, smin, smax, vmin, vmax = [0, 180, 0, 180, 88, 218]
     lower_mask = np.array([hmin, smin, vmin])

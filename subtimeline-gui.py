@@ -1,7 +1,7 @@
 '''
 @作者: weimo
 @创建日期: 2020-03-31 13:20:26
-@上次编辑时间: 2020-04-01 00:05:58
+@上次编辑时间: 2020-04-02 00:56:49
 @一个人的命运啊,当然要靠自我奋斗,但是...
 '''
 import os
@@ -13,6 +13,7 @@ from pathlib import Path
 from PyQt5 import QtCore, QtGui, QtWidgets
 from ui.gui import PaintQSlider
 from ui.frame_display import FrameDisplayArea
+from ui.frame_stack import FrameStack
 from util.get_params import only_subtitle
 
 ALLOW_VIDEO_SUFFIXS = ["mkv", "mp4", "flv", "ts"]
@@ -34,6 +35,7 @@ class GUI(QtWidgets.QMainWindow):
         self.setAttribute(QtCore.Qt.WA_StyledBackground, True)
         self.vc = None
         self.max_frame_to_stack = 5
+        self.select_frame_is_locked = False
         self.sliderslabel = {}
         self.设置图标和窗口标题等()
         self.设置图片显示区域()
@@ -65,7 +67,7 @@ class GUI(QtWidgets.QMainWindow):
     def 绘制slider(self):
         start_x = self.window_width - 500
         start_y = 25
-        self.hminslider = PaintQSlider(QtCore.Qt.Horizontal, self, minimum=1, maximum=360, minimumWidth=360, minimumHeight=75)
+        self.hminslider = PaintQSlider(QtCore.Qt.Horizontal, self, minimum=0, maximum=360, minimumWidth=360, minimumHeight=75)
         self.hminslider.setGeometry(QtCore.QRect(start_x, start_y, 360, 75))
         self.hminslider.setObjectName("hminslider")
         self.sliderslabel[self.hminslider.objectName()] = QtWidgets.QLabel(self)
@@ -74,7 +76,7 @@ class GUI(QtWidgets.QMainWindow):
         self.sliderslabel[self.hminslider.objectName()].setAlignment(QtCore.Qt.AlignHCenter|QtCore.Qt.AlignVCenter)
         self.hminslider.value_update.connect(self.update_slider_label)
         start_y += 50
-        self.hmaxslider = PaintQSlider(QtCore.Qt.Horizontal, self, minimum=1, maximum=360, minimumWidth=360, minimumHeight=75)
+        self.hmaxslider = PaintQSlider(QtCore.Qt.Horizontal, self, minimum=0, maximum=360, minimumWidth=360, minimumHeight=75)
         self.hmaxslider.setGeometry(QtCore.QRect(start_x, start_y, 360, 75))
         self.hmaxslider.setObjectName("hmaxslider")
         self.sliderslabel[self.hmaxslider.objectName()] = QtWidgets.QLabel(self)
@@ -83,7 +85,7 @@ class GUI(QtWidgets.QMainWindow):
         self.sliderslabel[self.hmaxslider.objectName()].setAlignment(QtCore.Qt.AlignHCenter|QtCore.Qt.AlignVCenter)
         self.hmaxslider.value_update.connect(self.update_slider_label)
         start_y += 50
-        self.sminslider = PaintQSlider(QtCore.Qt.Horizontal, self, minimum=1, maximum=255, minimumWidth=360, minimumHeight=75)
+        self.sminslider = PaintQSlider(QtCore.Qt.Horizontal, self, minimum=0, maximum=255, minimumWidth=360, minimumHeight=75)
         self.sminslider.setGeometry(QtCore.QRect(start_x, start_y, 360, 75))
         self.sminslider.setObjectName("sminslider")
         self.sliderslabel[self.sminslider.objectName()] = QtWidgets.QLabel(self)
@@ -92,7 +94,7 @@ class GUI(QtWidgets.QMainWindow):
         self.sliderslabel[self.sminslider.objectName()].setAlignment(QtCore.Qt.AlignHCenter|QtCore.Qt.AlignVCenter)
         self.sminslider.value_update.connect(self.update_slider_label)
         start_y += 50
-        self.smaxslider = PaintQSlider(QtCore.Qt.Horizontal, self, minimum=1, maximum=255, minimumWidth=360, minimumHeight=75)
+        self.smaxslider = PaintQSlider(QtCore.Qt.Horizontal, self, minimum=0, maximum=255, minimumWidth=360, minimumHeight=75)
         self.smaxslider.setGeometry(QtCore.QRect(start_x, start_y, 360, 75))
         self.smaxslider.setObjectName("smaxslider")
         self.sliderslabel[self.smaxslider.objectName()] = QtWidgets.QLabel(self)
@@ -101,7 +103,7 @@ class GUI(QtWidgets.QMainWindow):
         self.sliderslabel[self.smaxslider.objectName()].setAlignment(QtCore.Qt.AlignHCenter|QtCore.Qt.AlignVCenter)
         self.smaxslider.value_update.connect(self.update_slider_label)
         start_y += 50
-        self.vminslider = PaintQSlider(QtCore.Qt.Horizontal, self, minimum=1, maximum=255, minimumWidth=360, minimumHeight=75)
+        self.vminslider = PaintQSlider(QtCore.Qt.Horizontal, self, minimum=0, maximum=255, minimumWidth=360, minimumHeight=75)
         self.vminslider.setGeometry(QtCore.QRect(start_x, start_y, 360, 75))
         self.vminslider.setObjectName("vminslider")
         self.sliderslabel[self.vminslider.objectName()] = QtWidgets.QLabel(self)
@@ -110,7 +112,7 @@ class GUI(QtWidgets.QMainWindow):
         self.sliderslabel[self.vminslider.objectName()].setAlignment(QtCore.Qt.AlignHCenter|QtCore.Qt.AlignVCenter)
         self.vminslider.value_update.connect(self.update_slider_label)
         start_y += 50
-        self.vmaxslider = PaintQSlider(QtCore.Qt.Horizontal, self, minimum=1, maximum=255, minimumWidth=360, minimumHeight=75)
+        self.vmaxslider = PaintQSlider(QtCore.Qt.Horizontal, self, minimum=0, maximum=255, minimumWidth=360, minimumHeight=75)
         self.vmaxslider.setGeometry(QtCore.QRect(start_x, start_y, 360, 75))
         self.vmaxslider.setObjectName("vmaxslider")
         self.sliderslabel[self.vmaxslider.objectName()] = QtWidgets.QLabel(self)
@@ -185,6 +187,23 @@ class GUI(QtWidgets.QMainWindow):
         self.select_frame_button.setObjectName("select_frame_button")
         self.select_frame_button.setText("选定当前帧")
         self.select_frame_button.clicked.connect(self.select_frame)
+        self.find_inrange_params_button = QtWidgets.QPushButton(self)
+        self.find_inrange_params_button.setGeometry(QtCore.QRect(box_x + box_w + 10, box_y - 10 - box_h, box_w, box_h))
+        self.find_inrange_params_button.setObjectName("find_inrange_params_button")
+        self.find_inrange_params_button.setText("二值化调整")
+        self.find_inrange_params_button.clicked.connect(self.lock_and_connect)
+    
+    def lock_and_connect(self):
+        if self.select_frame_is_locked is True:
+            self.show_debug_info(f"选定当前帧已经被锁定过了")
+            return
+        self.select_frame_is_locked = True
+        self.hminslider.valueChanged.connect(self.find_inrange_params)
+        self.hmaxslider.valueChanged.connect(self.find_inrange_params)
+        self.sminslider.valueChanged.connect(self.find_inrange_params)
+        self.smaxslider.valueChanged.connect(self.find_inrange_params)
+        self.vminslider.valueChanged.connect(self.find_inrange_params)
+        self.vmaxslider.valueChanged.connect(self.find_inrange_params)
 
     def 设置视频输入路径输入框(self):
         box_x = 40
@@ -243,13 +262,16 @@ class GUI(QtWidgets.QMainWindow):
         retval, frame = self.vc.read()
         _frame = cv2.resize(frame, self.frame_display_area.resize_box[1])
         self.frame_display_area.show_select_frame(_frame, self.frame_display_area.resize_box[1])
+        if self.max_frame_to_stack <= 0:
+            self.show_debug_info(f"已达到上限")
+            return
+        if self.select_frame_is_locked:
+            self.show_debug_info(f"禁止新增选定帧")
+            return
         if args.__len__() == 1 and args[0] is False:
             self.cut_frame_to_concat(frame)
 
     def cut_frame_to_concat(self, frame: np.ndarray):
-        if self.max_frame_to_stack <= 0:
-            self.show_debug_info(f"已达到上限")
-            return
         if self.max_frame_to_stack == 5:
             # 第一次 则生成一个部件
             (video_width, video_height), (_frame_width, _frame_height) = self.frame_display_area.resize_box
@@ -265,6 +287,17 @@ class GUI(QtWidgets.QMainWindow):
             self.frame_stack.append(frame)
         self.max_frame_to_stack -= 1
 
+    def find_inrange_params(self):
+        params = [
+            self.hminslider.value(),
+            self.hmaxslider.value(),
+            self.sminslider.value(),
+            self.smaxslider.value(),
+            self.vminslider.value(),
+            self.vmaxslider.value()
+        ]
+        self.frame_stack.do_inrange(params)
+
     @QtCore.pyqtSlot(str)
     def show_debug_info(self, text):
         print(f"debug -> {text}")
@@ -279,39 +312,6 @@ class GUI(QtWidgets.QMainWindow):
             x, y, w, h = self.frame_display_area.geometry().getRect()
             rect = self.cutxslider.value(), self.cutyslider.value(), self.cutwslider.value(), self.cuthslider.value()
             self.frame_display_area.set_new_rect(rect)
-
-class FrameStack(QtWidgets.QLabel):
-
-    def __init__(self, cbox: tuple, *args, **kwargs):
-        super(FrameStack, self).__init__(*args, **kwargs)
-        self.frame = None
-        self.cut_x, self.cut_y, self.cut_w, self.cut_h = cbox
-        self.设置图标和窗口标题等()
-
-    def append(self, frame: np.ndarray):
-        frame = frame[self.cut_y:self.cut_y+self.cut_h, self.cut_x:self.cut_x+self.cut_w]
-        self.frame = np.vstack((self.frame, frame))
-        frame_height, frame_width, channels = self.frame.shape
-        _frame = QtGui.QImage(self.frame, frame_width, frame_height, QtGui.QImage.Format_RGB888).rgbSwapped()
-        self.resize(frame_width, frame_height)
-        self.setPixmap(QtGui.QPixmap(_frame))
-
-    def show_with_first_frame(self, frame: np.ndarray):
-        frame = frame[self.cut_y:self.cut_y+self.cut_h, self.cut_x:self.cut_x+self.cut_w]
-        self.frame = frame
-        frame_height, frame_width, channels = self.frame.shape
-        _frame = QtGui.QImage(frame, frame_width, frame_height, QtGui.QImage.Format_RGB888).rgbSwapped()
-        self.setGeometry(0, 0, frame_width, frame_height)
-        self.setPixmap(QtGui.QPixmap(_frame))
-        self.show()
-
-    def 设置图标和窗口标题等(self):
-        self.setWindowTitle("SubTimeLine FrameStack")
-        icon = QtGui.QIcon()
-        icon.addPixmap(QtGui.QPixmap(r"ui\subtimeline.ico"), QtGui.QIcon.Normal, QtGui.QIcon.Off)
-        self.setWindowIcon(icon)
-        # self.setIconSize(QtCore.QSize(32, 32))
-        self.setStyleSheet('#MainWindow {background: #eedeb0;}')
 
 def main():
     app = QtWidgets.QApplication(sys.argv)
