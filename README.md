@@ -4,6 +4,7 @@
 
 GUI效果演示：http://pan.iqiyi.com/ext/paopao/?token=eJxjYGBgmBQtsZUBBA4lzQEAFcQDew.mp4
 
+![界面预览](http://puui.qpic.cn/vshpic/0/Hn6XV06k80NSOYAiRM4qIOk7aM6SVyo8gK1Y7p-L7imGCQOz_0/0)
 ![结果预览](http://puui.qpic.cn/vshpic/0/UG7pzw5ZCmPbM3Ga8ptbxMTox5weObjuaJa2bp1NZaDSAUDB_0/0)
 
 # 说明
