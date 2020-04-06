@@ -1,7 +1,7 @@
 '''
 @作者: weimo
 @创建日期: 2020-03-31 13:20:26
-@上次编辑时间: 2020-04-06 18:04:57
+@上次编辑时间: 2020-04-06 20:03:02
 @一个人的命运啊,当然要靠自我奋斗,但是...
 '''
 import os
@@ -9,8 +9,10 @@ import sys
 import cv2
 import numpy as np
 
+from datetime import datetime
 from pathlib import Path
 from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5.QtGui import QPainter, QColor, QPen
 from ui.gui import PaintQSlider
 from ui.frame_display import FrameDisplayArea
 from ui.frame_stack import FrameStack
@@ -18,6 +20,9 @@ from util.get_params import only_subtitle
 from util.transfer import load_config as load_inrange_config, save_custom_inrange_params
 
 ALLOW_VIDEO_SUFFIXS = ["mkv", "mp4", "flv", "ts"]
+
+def frame_index_to_time(frame_index: int, fps: float):
+    return datetime.utcfromtimestamp(frame_index / fps).strftime('%H:%M:%S')
 
 def 获取默认窗口大小():
     desktop = QtWidgets.QApplication.desktop()
@@ -36,6 +41,7 @@ class GUI(QtWidgets.QMainWindow):
         self.setAttribute(QtCore.Qt.WA_StyledBackground, True)
         self.vc = None
         self.iconfig = {}
+        self.video_fps = None
         self.video_path = Path()
         self.has_frame_stack = False
         self.max_frame_to_stack = 5
@@ -71,10 +77,11 @@ class GUI(QtWidgets.QMainWindow):
     def 设定slider(self, slidername: str, initargs: dict, sliderbox: tuple, sliderlabelbox: tuple, customtext: str = None):
         slider = PaintQSlider(QtCore.Qt.Horizontal, self, **initargs)
         slider.setObjectName(slidername)
-        slider.setGeometry(QtCore.QRect(*sliderbox))
+        # slider.setGeometry(QtCore.QRect(*sliderbox))
         # self.layout().addWidget(slider)
         setattr(self, slidername, slider)
-        # slider = self.findChild((PaintQSlider,), slidername)
+        slider = self.findChild((PaintQSlider,), slidername)
+        slider.setGeometry(QtCore.QRect(*sliderbox))
         self.sliderslabel[slider.objectName()] = QtWidgets.QLabel(self)
         self.sliderslabel[slider.objectName()].setGeometry(*sliderlabelbox)
         self.sliderslabel[slider.objectName()].setAlignment(QtCore.Qt.AlignHCenter|QtCore.Qt.AlignVCenter)
@@ -85,19 +92,26 @@ class GUI(QtWidgets.QMainWindow):
         slider.value_update.connect(self.update_slider_label)
 
     def 绘制slider(self):
+        
         sliderinitargs = {
+            "timeslider": {"minimum": 0, "maximum": 0, "minimumWidth": 0, "minimumHeight": 30},
             "hminslider": {"minimum": 0, "maximum": 360, "minimumWidth": 360, "minimumHeight": 75},
             "hmaxslider": {"minimum": 0, "maximum": 360, "minimumWidth": 360, "minimumHeight": 75},
             "sminslider": {"minimum": 0, "maximum": 255, "minimumWidth": 360, "minimumHeight": 75},
             "smaxslider": {"minimum": 0, "maximum": 255, "minimumWidth": 360, "minimumHeight": 75},
             "vminslider": {"minimum": 0, "maximum": 255, "minimumWidth": 360, "minimumHeight": 75},
             "vmaxslider": {"minimum": 0, "maximum": 255, "minimumWidth": 360, "minimumHeight": 75},
-            "frameslider": {"minimum": 0, "maximum": 0, "minimumWidth": 360, "minimumHeight": 75},
             "cutxslider": {"minimum": 0, "maximum": 1920, "minimumWidth": 360, "minimumHeight": 75},
             "cutyslider": {"minimum": 0, "maximum": 1080, "minimumWidth": 360, "minimumHeight": 75},
             "cutwslider": {"minimum": 0, "maximum": 1920, "minimumWidth": 360, "minimumHeight": 75},
             "cuthslider": {"minimum": 0, "maximum": 1080, "minimumWidth": 360, "minimumHeight": 75},
         }
+        x, y, w, h = self.frame_display_area.geometry().getRect()        
+        self.设定slider("timeslider", sliderinitargs["timeslider"], (x, y + h, w - 160, 30), (x + w - 160, y + h, 160, 30), customtext="time->00:00:00")
+        self.timeslider.custom_name = "time"
+        self.timeslider.drawtext = False
+        self.timeslider.show_frame_real_time = True
+        self.timeslider.show_frame.connect(self.select_frame)
         start_x = self.window_width - 500
         start_y = 25
         self.设定slider("hminslider", sliderinitargs["hminslider"], (start_x, start_y, 360, 75), (start_x + 365, start_y, 130, 75))
@@ -111,11 +125,6 @@ class GUI(QtWidgets.QMainWindow):
         self.设定slider("vminslider", sliderinitargs["vminslider"], (start_x, start_y, 360, 75), (start_x + 365, start_y, 130, 75))
         start_y += 50
         self.设定slider("vmaxslider", sliderinitargs["vmaxslider"], (start_x, start_y, 360, 75), (start_x + 365, start_y, 130, 75))
-        start_y += 50
-        self.设定slider("frameslider", sliderinitargs["frameslider"], (start_x, start_y, 360, 75), (start_x + 365, start_y, 130, 75), customtext="frames->0")
-        self.frameslider.custom_name = "frames"
-        self.frameslider.show_frame_real_time = True
-        self.frameslider.show_frame.connect(self.select_frame)
         start_y += 50
         self.设定slider("cutxslider", sliderinitargs["cutxslider"], (start_x, start_y, 360, 75), (start_x + 365, start_y, 130, 75))
         start_y += 50
@@ -222,8 +231,10 @@ class GUI(QtWidgets.QMainWindow):
             self.video_path = video_path
             if self.iconfig.get(str(self.video_path.name)):
                 self.setslidersvalue(connect=False)
-            self.show_debug_info(f"{self.video_path.name} 加载成功 共计{vc.get(cv2.CAP_PROP_FRAME_COUNT)}帧")
-            self.frameslider.setMaximum(vc.get(cv2.CAP_PROP_FRAME_COUNT))
+            self.video_fps = vc.get(cv2.CAP_PROP_FPS)
+            total_frames = vc.get(cv2.CAP_PROP_FRAME_COUNT)
+            self.show_debug_info(f"{self.video_path.name} 加载成功 共计{total_frames}帧")
+            self.timeslider.setMaximum(total_frames)
             #<---计算缩放前后大小 方便后续转换要剪切的区域--->
             video_width, video_height = vc.get(cv2.CAP_PROP_FRAME_WIDTH), vc.get(cv2.CAP_PROP_FRAME_HEIGHT)
             if video_width / video_height > self.frame_display_area.width() / self.frame_display_area.height():
@@ -254,7 +265,7 @@ class GUI(QtWidgets.QMainWindow):
         if self.vc is None:
             self.show_debug_info(f"没有加载视频")
             return
-        frame_index = self.frameslider.value()
+        frame_index = self.timeslider.value()
         self.vc.set(cv2.CAP_PROP_POS_FRAMES, frame_index)
         retval, frame = self.vc.read()
         _frame = cv2.resize(frame, self.frame_display_area.resize_box[1])
@@ -305,6 +316,12 @@ class GUI(QtWidgets.QMainWindow):
     @QtCore.pyqtSlot(int, str, str)
     def update_slider_label(self, value: int, name: str, custom_name: str):
         if custom_name:
+            if custom_name == "time":
+                if self.video_fps is None:
+                    value = "00:00:00"
+                else:
+                    # 帧数转时间
+                    value = frame_index_to_time(value, self.video_fps)
             self.sliderslabel[name].setText(f"{custom_name}->{value}")
         else:
             self.sliderslabel[name].setText(f"{name[:4]}->{value}")

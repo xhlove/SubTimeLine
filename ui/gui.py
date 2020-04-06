@@ -1,7 +1,7 @@
 '''
 @作者: weimo
 @创建日期: 2020-03-31 13:20:09
-@上次编辑时间: 2020-04-06 16:07:23
+@上次编辑时间: 2020-04-06 20:06:31
 @一个人的命运啊,当然要靠自我奋斗,但是...
 '''
 from PyQt5.QtCore import Qt, QRect, QPointF, pyqtSignal
@@ -49,6 +49,7 @@ class PaintQSlider(QSlider):
     def __init__(self, *args, **kwargs):
         super(PaintQSlider, self).__init__(*args, **kwargs)
         self.custom_name = ""
+        self.drawtext = True
         self.show_frame_real_time = False
         # 设置代理样式,主要用于计算和解决鼠标点击区域
         self.setStyle(SliderStyle())
@@ -100,14 +101,15 @@ class PaintQSlider(QSlider):
             r = rect.height() / 2
             painter.setBrush(QColor(255, 255, 255, 255))
             painter.drawRoundedRect(rect, r, r)
-            # 绘制文字
-            painter.setPen(QPen(Qt.red, 3))
-            width_should_sub = self.get_value_length()
-            if self.orientation() == Qt.Horizontal:  # 在上方绘制文字
-                x, y = rect.x() - width_should_sub // 2, rect.y() - rect.height() - 4
-            else:  # 在左侧绘制文字
-                x, y = rect.x() - rect.width() - 4, rect.y()
-            painter.drawText(x, y, rect.width() + width_should_sub, rect.height(), Qt.AlignCenter, str(self.value()))
+            if self.drawtext:
+                # 绘制文字
+                painter.setPen(QPen(Qt.red, 3))
+                width_should_sub = self.get_value_length()
+                if self.orientation() == Qt.Horizontal:  # 在上方绘制文字
+                    x, y = rect.x() - width_should_sub // 2, rect.y() - rect.height() - 4
+                else:  # 在左侧绘制文字
+                    x, y = rect.x() - rect.width() - 4, rect.y()
+                painter.drawText(x, y, rect.width() + width_should_sub, rect.height(), Qt.AlignCenter, str(self.value()))
         else:  # 实心圆
             r = rect.height() / 2
             painter.setBrush(Qt.white)
