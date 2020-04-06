@@ -1,7 +1,7 @@
 '''
 @作者: weimo
 @创建日期: 2020-04-02 00:03:36
-@上次编辑时间: 2020-04-02 00:47:31
+@上次编辑时间: 2020-04-06 16:58:30
 @一个人的命运啊,当然要靠自我奋斗,但是...
 '''
 import cv2
@@ -49,5 +49,5 @@ class FrameStack(QtWidgets.QLabel):
         frame_height, frame_width = frame.shape # 这里是二值化后的
         _frame = QtGui.QImage(frame, frame_width, frame_height, QtGui.QImage.Format_Indexed8)
         # self.resize(frame_width, frame_height)
-        cv2.imshow("demo", frame)
+        # cv2.imshow("demo", frame)
         self.setPixmap(QtGui.QPixmap(_frame))

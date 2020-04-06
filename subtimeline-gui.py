@@ -1,7 +1,7 @@
 '''
 @作者: weimo
 @创建日期: 2020-03-31 13:20:26
-@上次编辑时间: 2020-04-06 15:37:12
+@上次编辑时间: 2020-04-06 18:04:57
 @一个人的命运啊,当然要靠自我奋斗,但是...
 '''
 import os
@@ -15,7 +15,7 @@ from ui.gui import PaintQSlider
 from ui.frame_display import FrameDisplayArea
 from ui.frame_stack import FrameStack
 from util.get_params import only_subtitle
-from util.slider import 自定义slider
+from util.transfer import load_config as load_inrange_config, save_custom_inrange_params
 
 ALLOW_VIDEO_SUFFIXS = ["mkv", "mp4", "flv", "ts"]
 
@@ -35,6 +35,9 @@ class GUI(QtWidgets.QMainWindow):
         # self.centralwidget.setObjectName("centralwidget")
         self.setAttribute(QtCore.Qt.WA_StyledBackground, True)
         self.vc = None
+        self.iconfig = {}
+        self.video_path = Path()
+        self.has_frame_stack = False
         self.max_frame_to_stack = 5
         self.select_frame_is_locked = False
         self.sliderslabel = {}
@@ -74,11 +77,11 @@ class GUI(QtWidgets.QMainWindow):
         # slider = self.findChild((PaintQSlider,), slidername)
         self.sliderslabel[slider.objectName()] = QtWidgets.QLabel(self)
         self.sliderslabel[slider.objectName()].setGeometry(*sliderlabelbox)
+        self.sliderslabel[slider.objectName()].setAlignment(QtCore.Qt.AlignHCenter|QtCore.Qt.AlignVCenter)
         if customtext is None:
             self.sliderslabel[slider.objectName()].setText(f"{slider.objectName()[:4]}->{slider.value()}")
         else:
             self.sliderslabel[slider.objectName()].setText(customtext)
-        self.sliderslabel[slider.objectName()].setAlignment(QtCore.Qt.AlignHCenter|QtCore.Qt.AlignVCenter)
         slider.value_update.connect(self.update_slider_label)
 
     def 绘制slider(self):
@@ -110,6 +113,8 @@ class GUI(QtWidgets.QMainWindow):
         self.设定slider("vmaxslider", sliderinitargs["vmaxslider"], (start_x, start_y, 360, 75), (start_x + 365, start_y, 130, 75))
         start_y += 50
         self.设定slider("frameslider", sliderinitargs["frameslider"], (start_x, start_y, 360, 75), (start_x + 365, start_y, 130, 75), customtext="frames->0")
+        self.frameslider.custom_name = "frames"
+        self.frameslider.show_frame_real_time = True
         self.frameslider.show_frame.connect(self.select_frame)
         start_y += 50
         self.设定slider("cutxslider", sliderinitargs["cutxslider"], (start_x, start_y, 360, 75), (start_x + 365, start_y, 130, 75))
@@ -129,13 +134,18 @@ class GUI(QtWidgets.QMainWindow):
         h = w * 9 / 16
         self.frame_display_area = FrameDisplayArea(self, (x, y, w, h))
 
-    def 设置加载视频按钮(self, box_area: list):
+    def 设置加载视频按钮等(self, box_area: list):
         box_x, box_y, box_w, box_h = box_area
         self.load_video_button = QtWidgets.QPushButton(self)
         self.load_video_button.setGeometry(QtCore.QRect(box_x, box_y, box_w, box_h))
         self.load_video_button.setObjectName("load_video_button")
         self.load_video_button.setText("加载视频")
         self.load_video_button.clicked.connect(self.load_video)
+        self.save_inrange_params_button = QtWidgets.QPushButton(self)
+        self.save_inrange_params_button.setGeometry(QtCore.QRect(box_x, box_y - 10 - box_h, box_w, box_h))
+        self.save_inrange_params_button.setObjectName("save_inrange_params_button")
+        self.save_inrange_params_button.setText("保存参数")
+        self.save_inrange_params_button.clicked.connect(self.save_inrange_params)
         self.select_frame_button = QtWidgets.QPushButton(self)
         self.select_frame_button.setGeometry(QtCore.QRect(box_x + box_w + 10, box_y, box_w, box_h))
         self.select_frame_button.setObjectName("select_frame_button")
@@ -146,18 +156,43 @@ class GUI(QtWidgets.QMainWindow):
         self.find_inrange_params_button.setObjectName("find_inrange_params_button")
         self.find_inrange_params_button.setText("二值化调整")
         self.find_inrange_params_button.clicked.connect(self.lock_and_connect)
+        # 加载配置
+        self.iconfig, config_path = load_inrange_config()
+
+    def save_inrange_params(self):
+        if self.video_path.is_dir():
+            self.show_debug_info("还没有加载视频~")
+            return
+        if self.video_path.suffix[1:] not in ALLOW_VIDEO_SUFFIXS:
+            self.show_debug_info(f"{self.video_path.name} 后缀非法！")
+            return
+        params = [
+            self.hminslider.value(),
+            self.hmaxslider.value(),
+            self.sminslider.value(),
+            self.smaxslider.value(),
+            self.vminslider.value(),
+            self.vmaxslider.value()
+        ]
+        save_custom_inrange_params(params, str(self.video_path.name))
     
     def lock_and_connect(self):
         if self.select_frame_is_locked is True:
             self.show_debug_info(f"选定当前帧已经被锁定过了")
             return
         self.select_frame_is_locked = True
-        self.hminslider.valueChanged.connect(self.find_inrange_params)
-        self.hmaxslider.valueChanged.connect(self.find_inrange_params)
-        self.sminslider.valueChanged.connect(self.find_inrange_params)
-        self.smaxslider.valueChanged.connect(self.find_inrange_params)
-        self.vminslider.valueChanged.connect(self.find_inrange_params)
-        self.vmaxslider.valueChanged.connect(self.find_inrange_params)
+        self.setslidersvalue()
+        # 首次点击按钮时就执行二值化操作
+        self.find_inrange_params()
+
+    def setslidersvalue(self, video_name="", connect=True):
+        if self.iconfig.get(video_name) is None:
+            video_name = "default"
+        for name, value in zip(["hmin", "hmax", "smin", "smax", "vmin", "vmax"], self.iconfig[video_name]):
+            slider = self.findChild((PaintQSlider,), name + "slider")
+            slider.setValue(value)
+            if connect:
+                slider.valueChanged.connect(self.find_inrange_params)
 
     def 设置视频输入路径输入框(self):
         box_x = 40
@@ -170,7 +205,7 @@ class GUI(QtWidgets.QMainWindow):
         self.video_path_input_box.setAcceptDrops(True)
         self.video_path_input_box.installEventFilter(self)
         box_area = [box_x + box_w + 10, box_y, 100, box_h]
-        self.设置加载视频按钮(box_area)
+        self.设置加载视频按钮等(box_area)
 
     def load_video(self):
         video_path = Path(self.video_path_input_box.text())
@@ -184,7 +219,10 @@ class GUI(QtWidgets.QMainWindow):
             self.show_debug_info(f"无法打开 {video_path.name} !")
             return
         else:
-            self.show_debug_info(f"{video_path.name} 加载成功 共计{vc.get(cv2.CAP_PROP_FRAME_COUNT)}帧")
+            self.video_path = video_path
+            if self.iconfig.get(str(self.video_path.name)):
+                self.setslidersvalue(connect=False)
+            self.show_debug_info(f"{self.video_path.name} 加载成功 共计{vc.get(cv2.CAP_PROP_FRAME_COUNT)}帧")
             self.frameslider.setMaximum(vc.get(cv2.CAP_PROP_FRAME_COUNT))
             #<---计算缩放前后大小 方便后续转换要剪切的区域--->
             video_width, video_height = vc.get(cv2.CAP_PROP_FRAME_WIDTH), vc.get(cv2.CAP_PROP_FRAME_HEIGHT)
@@ -201,6 +239,11 @@ class GUI(QtWidgets.QMainWindow):
             self.cutyslider.setMaximum(self.frame_display_area.height())
             self.cutwslider.setMaximum(self.cutxslider.maximum())
             self.cuthslider.setMaximum(self.cutyslider.maximum())
+            # 设置一个默认范围
+            self.cutxslider.setValue(0)
+            self.cutyslider.setValue(self.frame_display_area.height() * 0.8)
+            self.cutwslider.setValue(self.cutxslider.maximum())
+            self.cuthslider.setValue(self.cutyslider.maximum() * 0.15)
             self.vc = vc
         # vc.set(cv2.CAP_PROP_POS_FRAMES, 6668)
         # retval, frame = vc.read()
@@ -223,6 +266,7 @@ class GUI(QtWidgets.QMainWindow):
             self.show_debug_info(f"禁止新增选定帧")
             return
         if args.__len__() == 1 and args[0] is False:
+            self.has_frame_stack = True
             self.cut_frame_to_concat(frame)
 
     def cut_frame_to_concat(self, frame: np.ndarray):
@@ -242,6 +286,8 @@ class GUI(QtWidgets.QMainWindow):
         self.max_frame_to_stack -= 1
 
     def find_inrange_params(self):
+        if self.has_frame_stack is False:
+            return
         params = [
             self.hminslider.value(),
             self.hmaxslider.value(),

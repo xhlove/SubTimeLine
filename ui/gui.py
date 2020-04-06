@@ -1,7 +1,7 @@
 '''
 @作者: weimo
 @创建日期: 2020-03-31 13:20:09
-@上次编辑时间: 2020-03-31 21:30:16
+@上次编辑时间: 2020-04-06 16:07:23
 @一个人的命运啊,当然要靠自我奋斗,但是...
 '''
 from PyQt5.QtCore import Qt, QRect, QPointF, pyqtSignal
@@ -49,6 +49,7 @@ class PaintQSlider(QSlider):
     def __init__(self, *args, **kwargs):
         super(PaintQSlider, self).__init__(*args, **kwargs)
         self.custom_name = ""
+        self.show_frame_real_time = False
         # 设置代理样式,主要用于计算和解决鼠标点击区域
         self.setStyle(SliderStyle())
 
@@ -112,7 +113,7 @@ class PaintQSlider(QSlider):
             painter.setBrush(Qt.white)
             painter.drawRoundedRect(rect, r, r)
         self.value_update.emit(self.value(), self.objectName(), self.custom_name)
-        if self.objectName() == "videoframeslider":
+        if self.show_frame_real_time:
             # 实时更新图像
             self.show_frame.emit()
 
