@@ -1,7 +1,7 @@
 '''
 @作者: weimo
 @创建日期: 2020-03-31 13:20:26
-@上次编辑时间: 2020-04-02 00:56:49
+@上次编辑时间: 2020-04-06 15:37:12
 @一个人的命运啊,当然要靠自我奋斗,但是...
 '''
 import os
@@ -15,6 +15,7 @@ from ui.gui import PaintQSlider
 from ui.frame_display import FrameDisplayArea
 from ui.frame_stack import FrameStack
 from util.get_params import only_subtitle
+from util.slider import 自定义slider
 
 ALLOW_VIDEO_SUFFIXS = ["mkv", "mp4", "flv", "ts"]
 
@@ -64,109 +65,62 @@ class GUI(QtWidgets.QMainWindow):
         self.setIconSize(QtCore.QSize(32, 32))
         self.setStyleSheet('#MainWindow {background: #eedeb0;}')
 
+    def 设定slider(self, slidername: str, initargs: dict, sliderbox: tuple, sliderlabelbox: tuple, customtext: str = None):
+        slider = PaintQSlider(QtCore.Qt.Horizontal, self, **initargs)
+        slider.setObjectName(slidername)
+        slider.setGeometry(QtCore.QRect(*sliderbox))
+        # self.layout().addWidget(slider)
+        setattr(self, slidername, slider)
+        # slider = self.findChild((PaintQSlider,), slidername)
+        self.sliderslabel[slider.objectName()] = QtWidgets.QLabel(self)
+        self.sliderslabel[slider.objectName()].setGeometry(*sliderlabelbox)
+        if customtext is None:
+            self.sliderslabel[slider.objectName()].setText(f"{slider.objectName()[:4]}->{slider.value()}")
+        else:
+            self.sliderslabel[slider.objectName()].setText(customtext)
+        self.sliderslabel[slider.objectName()].setAlignment(QtCore.Qt.AlignHCenter|QtCore.Qt.AlignVCenter)
+        slider.value_update.connect(self.update_slider_label)
+
     def 绘制slider(self):
+        sliderinitargs = {
+            "hminslider": {"minimum": 0, "maximum": 360, "minimumWidth": 360, "minimumHeight": 75},
+            "hmaxslider": {"minimum": 0, "maximum": 360, "minimumWidth": 360, "minimumHeight": 75},
+            "sminslider": {"minimum": 0, "maximum": 255, "minimumWidth": 360, "minimumHeight": 75},
+            "smaxslider": {"minimum": 0, "maximum": 255, "minimumWidth": 360, "minimumHeight": 75},
+            "vminslider": {"minimum": 0, "maximum": 255, "minimumWidth": 360, "minimumHeight": 75},
+            "vmaxslider": {"minimum": 0, "maximum": 255, "minimumWidth": 360, "minimumHeight": 75},
+            "frameslider": {"minimum": 0, "maximum": 0, "minimumWidth": 360, "minimumHeight": 75},
+            "cutxslider": {"minimum": 0, "maximum": 1920, "minimumWidth": 360, "minimumHeight": 75},
+            "cutyslider": {"minimum": 0, "maximum": 1080, "minimumWidth": 360, "minimumHeight": 75},
+            "cutwslider": {"minimum": 0, "maximum": 1920, "minimumWidth": 360, "minimumHeight": 75},
+            "cuthslider": {"minimum": 0, "maximum": 1080, "minimumWidth": 360, "minimumHeight": 75},
+        }
         start_x = self.window_width - 500
         start_y = 25
-        self.hminslider = PaintQSlider(QtCore.Qt.Horizontal, self, minimum=0, maximum=360, minimumWidth=360, minimumHeight=75)
-        self.hminslider.setGeometry(QtCore.QRect(start_x, start_y, 360, 75))
-        self.hminslider.setObjectName("hminslider")
-        self.sliderslabel[self.hminslider.objectName()] = QtWidgets.QLabel(self)
-        self.sliderslabel[self.hminslider.objectName()].setGeometry(start_x + 365, start_y, 130, 75)
-        self.sliderslabel[self.hminslider.objectName()].setText(f"{self.hminslider.objectName()[:4]}->{self.hminslider.value()}")
-        self.sliderslabel[self.hminslider.objectName()].setAlignment(QtCore.Qt.AlignHCenter|QtCore.Qt.AlignVCenter)
-        self.hminslider.value_update.connect(self.update_slider_label)
+        self.设定slider("hminslider", sliderinitargs["hminslider"], (start_x, start_y, 360, 75), (start_x + 365, start_y, 130, 75))
         start_y += 50
-        self.hmaxslider = PaintQSlider(QtCore.Qt.Horizontal, self, minimum=0, maximum=360, minimumWidth=360, minimumHeight=75)
-        self.hmaxslider.setGeometry(QtCore.QRect(start_x, start_y, 360, 75))
-        self.hmaxslider.setObjectName("hmaxslider")
-        self.sliderslabel[self.hmaxslider.objectName()] = QtWidgets.QLabel(self)
-        self.sliderslabel[self.hmaxslider.objectName()].setGeometry(start_x + 365, start_y, 130, 75)
-        self.sliderslabel[self.hmaxslider.objectName()].setText(f"{self.hmaxslider.objectName()[:4]}->{self.hmaxslider.value()}")
-        self.sliderslabel[self.hmaxslider.objectName()].setAlignment(QtCore.Qt.AlignHCenter|QtCore.Qt.AlignVCenter)
-        self.hmaxslider.value_update.connect(self.update_slider_label)
+        self.设定slider("hmaxslider", sliderinitargs["hmaxslider"], (start_x, start_y, 360, 75), (start_x + 365, start_y, 130, 75))
         start_y += 50
-        self.sminslider = PaintQSlider(QtCore.Qt.Horizontal, self, minimum=0, maximum=255, minimumWidth=360, minimumHeight=75)
-        self.sminslider.setGeometry(QtCore.QRect(start_x, start_y, 360, 75))
-        self.sminslider.setObjectName("sminslider")
-        self.sliderslabel[self.sminslider.objectName()] = QtWidgets.QLabel(self)
-        self.sliderslabel[self.sminslider.objectName()].setGeometry(start_x + 365, start_y, 130, 75)
-        self.sliderslabel[self.sminslider.objectName()].setText(f"{self.sminslider.objectName()[:4]}->{self.sminslider.value()}")
-        self.sliderslabel[self.sminslider.objectName()].setAlignment(QtCore.Qt.AlignHCenter|QtCore.Qt.AlignVCenter)
-        self.sminslider.value_update.connect(self.update_slider_label)
+        self.设定slider("sminslider", sliderinitargs["sminslider"], (start_x, start_y, 360, 75), (start_x + 365, start_y, 130, 75))
         start_y += 50
-        self.smaxslider = PaintQSlider(QtCore.Qt.Horizontal, self, minimum=0, maximum=255, minimumWidth=360, minimumHeight=75)
-        self.smaxslider.setGeometry(QtCore.QRect(start_x, start_y, 360, 75))
-        self.smaxslider.setObjectName("smaxslider")
-        self.sliderslabel[self.smaxslider.objectName()] = QtWidgets.QLabel(self)
-        self.sliderslabel[self.smaxslider.objectName()].setGeometry(start_x + 365, start_y, 130, 75)
-        self.sliderslabel[self.smaxslider.objectName()].setText(f"{self.smaxslider.objectName()[:4]}->{self.smaxslider.value()}")
-        self.sliderslabel[self.smaxslider.objectName()].setAlignment(QtCore.Qt.AlignHCenter|QtCore.Qt.AlignVCenter)
-        self.smaxslider.value_update.connect(self.update_slider_label)
+        self.设定slider("smaxslider", sliderinitargs["smaxslider"], (start_x, start_y, 360, 75), (start_x + 365, start_y, 130, 75))
         start_y += 50
-        self.vminslider = PaintQSlider(QtCore.Qt.Horizontal, self, minimum=0, maximum=255, minimumWidth=360, minimumHeight=75)
-        self.vminslider.setGeometry(QtCore.QRect(start_x, start_y, 360, 75))
-        self.vminslider.setObjectName("vminslider")
-        self.sliderslabel[self.vminslider.objectName()] = QtWidgets.QLabel(self)
-        self.sliderslabel[self.vminslider.objectName()].setGeometry(start_x + 365, start_y, 130, 75)
-        self.sliderslabel[self.vminslider.objectName()].setText(f"{self.vminslider.objectName()[:4]}->{self.vminslider.value()}")
-        self.sliderslabel[self.vminslider.objectName()].setAlignment(QtCore.Qt.AlignHCenter|QtCore.Qt.AlignVCenter)
-        self.vminslider.value_update.connect(self.update_slider_label)
+        self.设定slider("vminslider", sliderinitargs["vminslider"], (start_x, start_y, 360, 75), (start_x + 365, start_y, 130, 75))
         start_y += 50
-        self.vmaxslider = PaintQSlider(QtCore.Qt.Horizontal, self, minimum=0, maximum=255, minimumWidth=360, minimumHeight=75)
-        self.vmaxslider.setGeometry(QtCore.QRect(start_x, start_y, 360, 75))
-        self.vmaxslider.setObjectName("vmaxslider")
-        self.sliderslabel[self.vmaxslider.objectName()] = QtWidgets.QLabel(self)
-        self.sliderslabel[self.vmaxslider.objectName()].setGeometry(start_x + 365, start_y, 130, 75)
-        self.sliderslabel[self.vmaxslider.objectName()].setText(f"{self.vmaxslider.objectName()[:4]}->{self.vmaxslider.value()}")
-        self.sliderslabel[self.vmaxslider.objectName()].setAlignment(QtCore.Qt.AlignHCenter|QtCore.Qt.AlignVCenter)
-        self.vmaxslider.value_update.connect(self.update_slider_label)
+        self.设定slider("vmaxslider", sliderinitargs["vmaxslider"], (start_x, start_y, 360, 75), (start_x + 365, start_y, 130, 75))
         start_y += 50
-        self.videoframeslider = PaintQSlider(QtCore.Qt.Horizontal, self, minimum=0, maximum=0, minimumWidth=360, minimumHeight=75)
-        self.videoframeslider.setGeometry(QtCore.QRect(start_x, start_y, 360, 75))
-        self.videoframeslider.setObjectName("videoframeslider")
-        self.sliderslabel[self.videoframeslider.objectName()] = QtWidgets.QLabel(self)
-        self.sliderslabel[self.videoframeslider.objectName()].setGeometry(start_x + 365, start_y, 130, 75)
-        self.sliderslabel[self.videoframeslider.objectName()].setText(f"frames->{self.videoframeslider.value()}")
-        self.sliderslabel[self.videoframeslider.objectName()].setAlignment(QtCore.Qt.AlignHCenter|QtCore.Qt.AlignVCenter)
-        self.videoframeslider.custom_name = "frames"
-        self.videoframeslider.value_update.connect(self.update_slider_label)
-        self.videoframeslider.show_frame.connect(self.select_frame)
+        self.设定slider("frameslider", sliderinitargs["frameslider"], (start_x, start_y, 360, 75), (start_x + 365, start_y, 130, 75), customtext="frames->0")
+        self.frameslider.show_frame.connect(self.select_frame)
         start_y += 50
-        self.cutxslider = PaintQSlider(QtCore.Qt.Horizontal, self, minimum=0, maximum=1920, minimumWidth=360, minimumHeight=75)
-        self.cutxslider.setGeometry(QtCore.QRect(start_x, start_y, 360, 75))
-        self.cutxslider.setObjectName("cutxslider")
-        self.sliderslabel[self.cutxslider.objectName()] = QtWidgets.QLabel(self)
-        self.sliderslabel[self.cutxslider.objectName()].setGeometry(start_x + 365, start_y, 130, 75)
-        self.sliderslabel[self.cutxslider.objectName()].setText(f"{self.cutxslider.objectName()[:4]}->{self.cutxslider.value()}")
-        self.sliderslabel[self.cutxslider.objectName()].setAlignment(QtCore.Qt.AlignHCenter|QtCore.Qt.AlignVCenter)
-        self.cutxslider.value_update.connect(self.update_slider_label)
+        self.设定slider("cutxslider", sliderinitargs["cutxslider"], (start_x, start_y, 360, 75), (start_x + 365, start_y, 130, 75))
         start_y += 50
-        self.cutyslider = PaintQSlider(QtCore.Qt.Horizontal, self, minimum=0, maximum=1280, minimumWidth=360, minimumHeight=75)
-        self.cutyslider.setGeometry(QtCore.QRect(start_x, start_y, 360, 75))
-        self.cutyslider.setObjectName("cutyslider")
-        self.sliderslabel[self.cutyslider.objectName()] = QtWidgets.QLabel(self)
-        self.sliderslabel[self.cutyslider.objectName()].setGeometry(start_x + 365, start_y, 130, 75)
-        self.sliderslabel[self.cutyslider.objectName()].setText(f"{self.cutyslider.objectName()[:4]}->{self.cutyslider.value()}")
-        self.sliderslabel[self.cutyslider.objectName()].setAlignment(QtCore.Qt.AlignHCenter|QtCore.Qt.AlignVCenter)
-        self.cutyslider.value_update.connect(self.update_slider_label)
+        self.设定slider("cutyslider", sliderinitargs["cutyslider"], (start_x, start_y, 360, 75), (start_x + 365, start_y, 130, 75))
         start_y += 50
-        self.cutwslider = PaintQSlider(QtCore.Qt.Horizontal, self, minimum=0, maximum=self.cutxslider.maximum(), minimumWidth=360, minimumHeight=75)
-        self.cutwslider.setGeometry(QtCore.QRect(start_x, start_y, 360, 75))
-        self.cutwslider.setObjectName("cutwslider")
-        self.sliderslabel[self.cutwslider.objectName()] = QtWidgets.QLabel(self)
-        self.sliderslabel[self.cutwslider.objectName()].setGeometry(start_x + 365, start_y, 130, 75)
-        self.sliderslabel[self.cutwslider.objectName()].setText(f"{self.cutwslider.objectName()[:4]}->{self.cutwslider.value()}")
-        self.sliderslabel[self.cutwslider.objectName()].setAlignment(QtCore.Qt.AlignHCenter|QtCore.Qt.AlignVCenter)
-        self.cutwslider.value_update.connect(self.update_slider_label)
+        sliderinitargs["cutwslider"]["maximum"] = self.cutxslider.maximum()
+        self.设定slider("cutwslider", sliderinitargs["cutwslider"], (start_x, start_y, 360, 75), (start_x + 365, start_y, 130, 75))
         start_y += 50
-        self.cuthslider = PaintQSlider(QtCore.Qt.Horizontal, self, minimum=0, maximum=self.cutyslider.maximum(), minimumWidth=360, minimumHeight=75)
-        self.cuthslider.setGeometry(QtCore.QRect(start_x, start_y, 360, 75))
-        self.cuthslider.setObjectName("cuthslider")
-        self.sliderslabel[self.cuthslider.objectName()] = QtWidgets.QLabel(self)
-        self.sliderslabel[self.cuthslider.objectName()].setGeometry(start_x + 365, start_y, 130, 75)
-        self.sliderslabel[self.cuthslider.objectName()].setText(f"{self.cuthslider.objectName()[:4]}->{self.cuthslider.value()}")
-        self.sliderslabel[self.cuthslider.objectName()].setAlignment(QtCore.Qt.AlignHCenter|QtCore.Qt.AlignVCenter)
-        self.cuthslider.value_update.connect(self.update_slider_label)
+        sliderinitargs["cutwslider"]["maximum"] = self.cutyslider.maximum()
+        self.设定slider("cuthslider", sliderinitargs["cuthslider"], (start_x, start_y, 360, 75), (start_x + 365, start_y, 130, 75))
 
     def 设置图片显示区域(self):
         x = 40
@@ -231,7 +185,7 @@ class GUI(QtWidgets.QMainWindow):
             return
         else:
             self.show_debug_info(f"{video_path.name} 加载成功 共计{vc.get(cv2.CAP_PROP_FRAME_COUNT)}帧")
-            self.videoframeslider.setMaximum(vc.get(cv2.CAP_PROP_FRAME_COUNT))
+            self.frameslider.setMaximum(vc.get(cv2.CAP_PROP_FRAME_COUNT))
             #<---计算缩放前后大小 方便后续转换要剪切的区域--->
             video_width, video_height = vc.get(cv2.CAP_PROP_FRAME_WIDTH), vc.get(cv2.CAP_PROP_FRAME_HEIGHT)
             if video_width / video_height > self.frame_display_area.width() / self.frame_display_area.height():
@@ -257,7 +211,7 @@ class GUI(QtWidgets.QMainWindow):
         if self.vc is None:
             self.show_debug_info(f"没有加载视频")
             return
-        frame_index = self.videoframeslider.value()
+        frame_index = self.frameslider.value()
         self.vc.set(cv2.CAP_PROP_POS_FRAMES, frame_index)
         retval, frame = self.vc.read()
         _frame = cv2.resize(frame, self.frame_display_area.resize_box[1])
