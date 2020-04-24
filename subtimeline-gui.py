@@ -1,7 +1,7 @@
 '''
 @作者: weimo
 @创建日期: 2020-03-31 13:20:26
-@上次编辑时间: 2020-04-06 20:03:02
+@上次编辑时间: 2020-04-24 18:18:04
 @一个人的命运啊,当然要靠自我奋斗,但是...
 '''
 import os
@@ -16,6 +16,7 @@ from PyQt5.QtGui import QPainter, QColor, QPen
 from ui.gui import PaintQSlider
 from ui.frame_display import FrameDisplayArea
 from ui.frame_stack import FrameStack
+from ui.dropfile import DropEnable
 from util.get_params import only_subtitle
 from util.transfer import load_config as load_inrange_config, save_custom_inrange_params
 
@@ -51,20 +52,6 @@ class GUI(QtWidgets.QMainWindow):
         self.设置图片显示区域()
         self.绘制slider()
         self.设置视频输入路径输入框()
-
-    def eventFilter(self, source, event):
-        if event.type() == QtCore.QEvent.DragEnter:
-            event.accept()
-        if event.type() == QtCore.QEvent.Drop:
-            md = event.mimeData()
-            if md.hasUrls():
-                text = md.urls()[0].toLocalFile()
-                source.setText(text)
-                # if os.path.exists(text) and source.objectName() == "video_path_input_box":
-                #     name = os.path.splitext(os.path.split(text)[-1])[0]
-                #     self.video_path_input_box.setText(name)
-                return True
-        return super(GUI, self).eventFilter(source, event)
 
     def 设置图标和窗口标题等(self):
         self.setWindowTitle("SubTimeLine Control Panel v1.0")
@@ -211,8 +198,7 @@ class GUI(QtWidgets.QMainWindow):
         self.video_path_input_box = QtWidgets.QLineEdit(self)
         self.video_path_input_box.setGeometry(QtCore.QRect(box_x, box_y, box_w, box_h))
         self.video_path_input_box.setObjectName("video_path_input_box")
-        self.video_path_input_box.setAcceptDrops(True)
-        self.video_path_input_box.installEventFilter(self)
+        DropEnable(self.video_path_input_box)
         box_area = [box_x + box_w + 10, box_y, 100, box_h]
         self.设置加载视频按钮等(box_area)
 
