@@ -1,7 +1,7 @@
 '''
 @作者: weimo
 @创建日期: 2020-03-19 21:51:13
-@上次编辑时间: 2020-04-10 19:44:32
+@上次编辑时间: 2020-04-26 00:06:05
 @一个人的命运啊,当然要靠自我奋斗,但是...
 '''
 
@@ -17,6 +17,8 @@ from datetime import datetime
 
 from util.mser import get_mser
 from util.sst import SubStorage
+
+from PyQt5 import QtCore
 
 def nothing(x):
     pass
@@ -78,15 +80,24 @@ def log_calc_infos(text: str):
 
 
 
-class Worker(object):
+class Worker(QtCore.QThread):
+    progress_frame = QtCore.pyqtSignal(int)
     def __init__(self, video_path: Path, inrange_params: list, cbox: tuple, offset: int = 0, step: int = 12):
+        super(Worker, self).__init__()
         self.video_path = video_path.absolute()
         self.inrange_params = inrange_params
+        self.inrange_params_list = []
         self.cbox = cbox
         self.offset = offset
         self.step = step
         self.check()
         self.load_configs()
+        self.start_params = []
+
+    def run(self):
+        # 
+        offset, offset_key = self.start_params
+        self.work_start(offset, offset_key)
 
     def load_configs(self):
         self.similarity_threshold = 65
@@ -166,6 +177,7 @@ class Worker(object):
                 sst.stackstorage.update({offset:100.0})
                 base_frame_offset = offset
                 print(f"定位{offset}帧 开始寻找")
+                self.progress_frame.emit(offset)
                 seek_flag = True
             if seek_flag:
                 offset_start = self.seek_start(offset, cut_area, sst, ts, inrange_params)

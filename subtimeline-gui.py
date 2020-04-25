@@ -1,7 +1,7 @@
 '''
 @作者: weimo
 @创建日期: 2020-03-31 13:20:26
-@上次编辑时间: 2020-04-24 18:18:04
+@上次编辑时间: 2020-04-26 00:28:09
 @一个人的命运啊,当然要靠自我奋斗,但是...
 '''
 import os
@@ -19,6 +19,8 @@ from ui.frame_stack import FrameStack
 from ui.dropfile import DropEnable
 from util.get_params import only_subtitle
 from util.transfer import load_config as load_inrange_config, save_custom_inrange_params
+
+from subtimeline import Worker
 
 ALLOW_VIDEO_SUFFIXS = ["mkv", "mp4", "flv", "ts"]
 
@@ -142,6 +144,11 @@ class GUI(QtWidgets.QMainWindow):
         self.save_inrange_params_button.setObjectName("save_inrange_params_button")
         self.save_inrange_params_button.setText("保存参数")
         self.save_inrange_params_button.clicked.connect(self.save_inrange_params)
+        self.worker_button = QtWidgets.QPushButton(self)
+        self.worker_button.setGeometry(QtCore.QRect(box_x - box_w - 10, box_y - 10 - box_h, box_w, box_h))
+        self.worker_button.setObjectName("worker_button")
+        self.worker_button.setText("开始提取")
+        self.worker_button.clicked.connect(self.do_work)
         self.select_frame_button = QtWidgets.QPushButton(self)
         self.select_frame_button.setGeometry(QtCore.QRect(box_x + box_w + 10, box_y, box_w, box_h))
         self.select_frame_button.setObjectName("select_frame_button")
@@ -171,6 +178,7 @@ class GUI(QtWidgets.QMainWindow):
             self.vmaxslider.value()
         ]
         save_custom_inrange_params(params, str(self.video_path.name))
+        return params
     
     def lock_and_connect(self):
         if self.select_frame_is_locked is True:
@@ -180,6 +188,20 @@ class GUI(QtWidgets.QMainWindow):
         self.setslidersvalue()
         # 首次点击按钮时就执行二值化操作
         self.find_inrange_params()
+
+    @QtCore.pyqtSlot(int)
+    def goto_subtitle_frame(self, frame_index: int):
+        self.timeslider.setValue(frame_index)
+        self.select_frame(show_sub_inrange=True)
+
+    def do_work(self):
+        inrange_params = self.save_inrange_params()
+        self.worker = Worker(self.video_path, {f"0:{self.timeslider.maximum()}": inrange_params}, self.frame_stack.cbox)
+        self.worker.inrange_params_list = inrange_params
+        self.worker.progress_frame.connect(self.goto_subtitle_frame)
+        self.timeslider.show_frame.disconnect(self.select_frame)
+        self.worker.start_params = [0, f"0:{self.timeslider.maximum()}"]
+        self.worker.start()
 
     def setslidersvalue(self, video_name="", connect=True):
         if self.iconfig.get(video_name) is None:
@@ -247,13 +269,15 @@ class GUI(QtWidgets.QMainWindow):
         # cv2.imshow("frame", frame)
         # cv2.waitKey(0)
 
-    def select_frame(self, *args):
+    def select_frame(self, *args, **kwargs):
         if self.vc is None:
             self.show_debug_info(f"没有加载视频")
             return
         frame_index = self.timeslider.value()
         self.vc.set(cv2.CAP_PROP_POS_FRAMES, frame_index)
         retval, frame = self.vc.read()
+        if kwargs.get("show_sub_inrange") is True:
+            frame = self.frame_stack.do_inrange_in_subtitle_area(frame, self.worker.inrange_params_list)
         _frame = cv2.resize(frame, self.frame_display_area.resize_box[1])
         self.frame_display_area.show_select_frame(_frame, self.frame_display_area.resize_box[1])
         if self.max_frame_to_stack <= 0:
