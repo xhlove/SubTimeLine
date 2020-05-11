@@ -1,7 +1,7 @@
 '''
 @作者: weimo
 @创建日期: 2020-03-31 13:20:26
-@上次编辑时间: 2020-04-26 00:28:09
+@上次编辑时间: 2020-05-11 18:51:47
 @一个人的命运啊,当然要靠自我奋斗,但是...
 '''
 import os
@@ -17,7 +17,7 @@ from ui.gui import PaintQSlider
 from ui.frame_display import FrameDisplayArea
 from ui.frame_stack import FrameStack
 from ui.dropfile import DropEnable
-from util.get_params import only_subtitle
+from util.inrange import convert_img_hsv_with_inrange
 from util.transfer import load_config as load_inrange_config, save_custom_inrange_params
 
 from subtimeline import Worker

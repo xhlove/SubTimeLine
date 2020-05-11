@@ -1,7 +1,7 @@
 '''
 @作者: weimo
 @创建日期: 2020-03-26 19:17:52
-@上次编辑时间: 2020-03-31 00:42:47
+@上次编辑时间: 2020-05-12 03:21:57
 @一个人的命运啊,当然要靠自我奋斗,但是...
 '''
 import cv2
@@ -10,10 +10,60 @@ import numpy as np
 MIN_SPACE = 300
 MAX_HEIGHT = 60
 
+def get_box_weight(bboxes, half_width):
+    left_boxes = [half_width - (x + w / 2) for x, y, w, h in bboxes if x + w / 2 < half_width]
+    if len(left_boxes) == 0:
+        return 0, 0
+    left_weight = sum(left_boxes) / len(left_boxes)
+    right_boxes = [x + w / 2 - half_width for x, y, w, h in bboxes if x + w / 2 > half_width]
+    if len(right_boxes) == 0:
+        return 0, 0
+    right_weight = sum(right_boxes) / len(right_boxes)
+    return left_weight, right_weight
+
+def filter_extreme_box(bboxes, half_width):
+    # 通过box位置分布去除异常box
+    data = [x if x + w / 2 < half_width else x + w for x, y, w, h in bboxes]
+    target_max = half_width + 2 * np.std(data)
+    target_min = half_width - 2 * np.std(data)
+    # 过滤处理一些box
+    bboxes = [(x, y, w, h) for index, (x, y, w, h) in enumerate(bboxes) if x >= target_min and x + w <= target_max]
+    # 检查box是否平衡
+    left_weight, right_weight = get_box_weight(bboxes, half_width)
+    # print(len(bboxes), left_weight, right_weight)
+    if left_weight > right_weight * 1.5:
+        while left_weight > right_weight * 1.5:
+            rindex = None
+            minxw = half_width
+            for index, (x, y, w, h) in enumerate(bboxes):
+                if x + w / 2 < minxw:
+                    minxw = x + w / 2
+                    rindex = index
+            bboxes = [box for index, box in enumerate(bboxes) if index != rindex]
+            left_weight, right_weight = get_box_weight(bboxes, half_width)
+    if right_weight > left_weight * 1.5:
+        while right_weight > left_weight * 1.5:
+            rindex = None
+            maxyh = half_width
+            for index, (x, y, w, h) in enumerate(bboxes):
+                if x + w / 2 > maxyh:
+                    minxw = x + w / 2
+                    rindex = index
+            bboxes = [box for index, box in enumerate(bboxes) if index != rindex]
+            left_weight, right_weight = get_box_weight(bboxes, half_width)
+    # print("___+++____", len(bboxes), left_weight, right_weight)
+    return bboxes
+
 def filter_box(bboxes: np.ndarray, img: np.ndarray, half_width: float):
     if bboxes.__len__() == 0:
         return bboxes, (0, 0, 0, 0), 0
-    # 过滤处理一些box
+    bboxes = filter_extreme_box(bboxes, half_width)
+    img_bak = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
+    for x, y, w, h in bboxes:
+        cv2.rectangle(img_bak, (x, y), (x + w, y + h), (255, 255, 0), 2)
+    cv2.imshow(f"{9}_img_mser_color", img_bak)
+    cv2.waitKey(0)
+
     xs, ys, ws, hs, _xs, _wh = [], [], [], [], [], []
     _ = [(xs.append(x), ys.append(y), ws.append(x + w), hs.append(y + h), _xs.append([x, x + w]), _wh.append(w / h)) for x, y, w, h in bboxes]
     # if bboxes.__len__() == 1:
@@ -30,12 +80,12 @@ def filter_box(bboxes: np.ndarray, img: np.ndarray, half_width: float):
         if zero_plus == 0 or zero_reduce == 0:
             return (), (0, 0, 0, 0), 0
     # 很近的时候就不用加入了
-    data_distances = [abs(_) for _ in data_distances if _ > 0.1]
-    if data_distances.__len__() > 1:
-        max_distance = np.median(data_distances) * 1.5
-        # print(f"data_distances -> {data_distances} max_distance -> {max_distance}")
-        remove_indices = [index for index, distance in enumerate(data_distances) if distance > max_distance or _wh[index] > 4]
-        bboxes = [box for index, box in enumerate(bboxes) if index not in remove_indices]
+    # data_distances = [abs(_) for _ in data_distances if abs(_) > 0.1]
+    # if data_distances.__len__() > 1:
+    #     max_distance = np.median(data_distances) * 1.5
+    #     # print(f"data_distances -> {data_distances} max_distance -> {max_distance}")
+    #     remove_indices = [index for index, distance in enumerate(data_distances) if distance > max_distance or _wh[index] > 4]
+    #     bboxes = [box for index, box in enumerate(bboxes) if index not in remove_indices]
     if bboxes.__len__() == 0:
         return bboxes, (0, 0, 0, 0), 0
     if bboxes.__len__() == 1:
@@ -52,10 +102,14 @@ def get_mser(img: np.ndarray, frame_index: int, shape: tuple, min_area=300, isba
     height, width, channels = shape # 注意这里的frame是彩色的
     half_width = width / 2
     box_area = 0
+
+    # 在MSER之前有必要计算白色区域占比 以排除一些虽然会找到box却不是字幕的帧 例如背景有白色规则物体时
+    # dict(zip(*np.unique(frame_subtitle[y:h, x:w], return_counts=True)))
+
     mser = cv2.MSER_create(_min_area=min_area)
     # img = cv2.dilate(img, cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3)))
     regions, bboxes = mser.detectRegions(img)
-    if frame_index == 19688:
+    if frame_index == -1:
         img_bak = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
         for x, y, w, h in bboxes:
             cv2.rectangle(img_bak, (x, y), (x + w, y + h), (255, 255, 0), 2)

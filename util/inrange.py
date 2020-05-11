@@ -1,7 +1,7 @@
 '''
 @作者: weimo
 @创建日期: 2020-03-29 09:51:05
-@上次编辑时间: 2020-04-09 19:42:40
+@上次编辑时间: 2020-05-11 18:48:38
 @一个人的命运啊,当然要靠自我奋斗,但是...
 '''
 from pathlib import Path
@@ -9,6 +9,13 @@ from pathlib import Path
 import cv2
 import sys
 import numpy as np
+
+def convert_img_hsv_with_inrange(img: np.ndarray, inrange_params: list):
+    hmin, hmax, smin, smax, vmin, vmax = inrange_params
+    lower_blue = np.array([hmin, smin, vmin])
+    upper_blue = np.array([hmax, smax, vmax])
+    img_ = cv2.inRange(cv2.cvtColor(img, cv2.COLOR_BGR2HSV), lower_blue, upper_blue)
+    return img_
 
 def nothing(x):
     pass
