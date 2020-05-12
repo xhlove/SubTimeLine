@@ -1,7 +1,7 @@
 '''
 @作者: weimo
 @创建日期: 2020-03-19 21:51:13
-@上次编辑时间: 2020-05-12 02:53:53
+@上次编辑时间: 2020-05-12 17:58:57
 @一个人的命运啊,当然要靠自我奋斗,但是...
 '''
 
@@ -16,15 +16,19 @@ import numpy as np
 from sklearn import metrics as mr
 from datetime import datetime
 
+from PyQt5 import QtCore
+
 from util.writeass import write_ass_line
 from util.sst import SubStorage
-from util.act import find_subtitle_box
+from util.act import find_subtitle_box, get_white_ratio
+from logs.logger import get_logger
 
-from PyQt5 import QtCore
+logger = get_logger(Path(r"logs\subtimeline.log"))
+ratio_logger = get_logger(Path(r"logs\frame_white_ratio.log"))
 
 class Worker(QtCore.QThread):
     progress_frame = QtCore.pyqtSignal(int)
-    def __init__(self, video_path: Path, inrange_params: list, cbox: tuple, offset: int = 0, step: int = 36):
+    def __init__(self, video_path: Path, inrange_params: list, cbox: tuple, offset: int = 0, step: int = 48):
         super(Worker, self).__init__()
         self.video_path = video_path.absolute()
         self.inrange_params = inrange_params
@@ -42,7 +46,7 @@ class Worker(QtCore.QThread):
         self.work_start(offset, offset_key)
 
     def load_configs(self):
-        self.similarity_threshold = 65
+        self.similarity_threshold = 60
 
     def calc_frame_time(self, frame_index: int):
         return datetime.utcfromtimestamp(frame_index / self.video_fps).strftime('%H:%M:%S.%f')[1:-4]
@@ -109,26 +113,28 @@ class Worker(QtCore.QThread):
                 cut_h = h - y
                 cut_area = [cut_x, cut_y, cut_w, cut_h]
                 base_frame = frame[y:h, x:w]
-                pic_save_path = Path(f"subpics/{offset}.jpg")
-                cv2.imwrite(str(pic_save_path), base_frame)
+                ratio_logger.info(f"{offset:>5} {get_white_ratio(base_frame):>5.2f}")
                 sst.base_frame = base_frame
                 sst.offset_base = offset
                 sst.base_frame_area = box_area
-                sst.base_frame_white_counts = self.base_frame_counts(base_frame)
                 sst.stackstorage.update({offset:100.0})
                 base_frame_offset = offset
                 print(f"定位{offset}帧 开始寻找")
                 self.progress_frame.emit(offset)
                 seek_flag = True
             if seek_flag:
-                print(offset_end, offset, offset_end is not None and offset_end - offset == 1)
+                # print(offset_end, offset, offset_end is not None and offset_end - offset == 1)
                 if offset_end is not None and offset_end - offset == 1:
                     print("前后字幕相邻~~~~~~~~~~~~~~~~~~")
                     offset_start = offset
                 else:
                     offset_start = self.seek_start(offset, cut_area, sst, ts, inrange_params)
                 offset_end = self.seek_end(offset, cut_area, sst, ts, inrange_params)
-                write_ass_line(f"Dialogue: 0,{self.calc_frame_time(offset_start)},{self.calc_frame_time(offset_end)},微软雅黑,,0,0,0,,{offset_start}-{offset_end}")
+                if offset_end - offset_start >= 8:
+                    # 间隔太近的不可以认为是一句话
+                    pic_save_path = Path(f"subpics/{offset}.jpg")
+                    cv2.imwrite(str(pic_save_path), base_frame)
+                    write_ass_line(f"Dialogue: 0,{self.calc_frame_time(offset_start)},{self.calc_frame_time(offset_end)},微软雅黑,,0,0,0,,{offset_start}-{offset_end}")
                 offset = offset_end + 1
                 sst = SubStorage()
                 seek_flag = False
@@ -148,17 +154,15 @@ class Worker(QtCore.QThread):
             if retval is False:
                 sys.exit(f"retval is False at {offset} ! exit...")
             boxes, box_area, frame = find_subtitle_box(frame[cut_y:cut_y+cut_h, cut_x:cut_x+cut_w], inrange_params, offset)
-            similarity = mr.normalized_mutual_info_score(frame.reshape(-1), sst.base_frame.reshape(-1)) * 100
-            # similarity, _base_frame = self.get_diff(frame, sst.base_frame, sst.base_frame_white_counts)
+            similarity = mr.normalized_mutual_info_score((frame&sst.base_frame).reshape(-1), sst.base_frame.reshape(-1)) * 100
             
             sst.stackstorage.update({offset:similarity})
             sst.sort_stack()
             offset_index_in_stack = list(sst.stackstorage.keys())[list(sst.stackstorage.keys()).index(offset)]
             left_key = offset_index_in_stack - 1
             right_key = offset_index_in_stack + 1
-            print(f"seek_end --> {offset} {similarity:.2f},left_key {left_key} right_key {right_key}")
+            logger.info(f"seek_end --> {offset} {similarity:.2f},left_key {left_key} right_key {right_key}")
             if similarity >= 85:
-                # sst.base_frame_white_counts = self.base_frame_counts(_base_frame)
                 sst.base_frame = frame & sst.base_frame
             if similarity >= self.similarity_threshold:
                 if boxes == "no subtitle":
@@ -213,9 +217,8 @@ class Worker(QtCore.QThread):
             if retval is False:
                 sys.exit(f"retval is False at {offset} ! exit...")
             boxes, box_area, frame = find_subtitle_box(frame[cut_y:cut_y+cut_h, cut_x:cut_x+cut_w], inrange_params, offset)
-            similarity = mr.normalized_mutual_info_score(frame.reshape(-1), sst.base_frame.reshape(-1)) * 100
-            # similarity, _base_frame = self.get_diff(frame, sst.base_frame, sst.base_frame_white_counts)
-            print(f"--> {offset} {similarity:.2f}")
+            similarity = mr.normalized_mutual_info_score((frame&sst.base_frame).reshape(-1), sst.base_frame.reshape(-1)) * 100
+            logger.info(f"seek_start --> {offset} {similarity:.2f}")
             sst.stackstorage.update({offset:similarity})
             sst.sort_stack()
             offset_index_in_stack = list(sst.stackstorage.keys())[list(sst.stackstorage.keys()).index(offset)]
@@ -223,11 +226,9 @@ class Worker(QtCore.QThread):
             right_key = offset_index_in_stack + 1
             #<------进行判断 寻找下一个位置或得到最终结果------>
             if similarity >= 85:
-                # 修正base_frame 并重新计数
-                # sst.base_frame_white_counts = self.base_frame_counts(_base_frame)
+                # 修正base_frame
                 sst.base_frame = frame & sst.base_frame
             #<----增加一个面积的辅助判断---->
-            # _similarity_bak = box_area / sst.base_frame_area
             if similarity >= self.similarity_threshold:
                 if boxes == "no subtitle":
                     print(f"{offset} {sst.offset_base} 警告！匹配判断与直接判断冲突")
@@ -256,8 +257,6 @@ class Worker(QtCore.QThread):
                 if sst.stackstorage.get(right_key) is not None and sst.stackstorage[right_key] >= self.similarity_threshold:
                     sst.offset_start = right_key
                     print(f"{right_key}是{sst.offset_base}的起始帧 ××√")
-                    # cv2.imwrite(f"frames/{sst.offset_start}_start_{offset}.jpg", frame)
-                    # cv2.imwrite(f"frames/{sst.offset_start}_start.jpg", sst.base_frame)
                     find_offset_start = True
                     break
                 else:

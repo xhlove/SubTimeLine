@@ -1,7 +1,7 @@
 '''
 @作者: weimo
 @创建日期: 2020-03-26 19:17:52
-@上次编辑时间: 2020-05-12 03:21:57
+@上次编辑时间: 2020-05-12 16:53:24
 @一个人的命运啊,当然要靠自我奋斗,但是...
 '''
 import cv2
@@ -9,6 +9,13 @@ import numpy as np
 
 MIN_SPACE = 300
 MAX_HEIGHT = 60
+
+def draw_box(img: np.ndarray, bboxes: list, title="+_+"):
+    img_bak = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
+    for x, y, w, h in bboxes:
+        cv2.rectangle(img_bak, (x, y), (x + w, y + h), (255, 255, 0), 2)
+    cv2.imshow(f"{title}_{len(bboxes)}_boxes", img_bak)
+    # cv2.waitKey(0)
 
 def get_box_weight(bboxes, half_width):
     left_boxes = [half_width - (x + w / 2) for x, y, w, h in bboxes if x + w / 2 < half_width]
@@ -26,6 +33,7 @@ def filter_extreme_box(bboxes, half_width):
     data = [x if x + w / 2 < half_width else x + w for x, y, w, h in bboxes]
     target_max = half_width + 2 * np.std(data)
     target_min = half_width - 2 * np.std(data)
+    # print(data, target_max, target_min, np.std(data))
     # 过滤处理一些box
     bboxes = [(x, y, w, h) for index, (x, y, w, h) in enumerate(bboxes) if x >= target_min and x + w <= target_max]
     # 检查box是否平衡
@@ -57,13 +65,37 @@ def filter_extreme_box(bboxes, half_width):
 def filter_box(bboxes: np.ndarray, img: np.ndarray, half_width: float):
     if bboxes.__len__() == 0:
         return bboxes, (0, 0, 0, 0), 0
-    bboxes = filter_extreme_box(bboxes, half_width)
-    img_bak = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
-    for x, y, w, h in bboxes:
-        cv2.rectangle(img_bak, (x, y), (x + w, y + h), (255, 255, 0), 2)
-    cv2.imshow(f"{9}_img_mser_color", img_bak)
-    cv2.waitKey(0)
-
+    # 按x位置对box从左到右排序
+    bboxes = sorted(bboxes, key=lambda box: box[0])
+    # print(bboxes)
+    # draw_box(img, bboxes, title="MSER")
+    # 两个box相交 那么合并这两个box 注意box已经按x大小排序过了的
+    _bboxes = [bboxes[0]]
+    box_x, box_y, box_w, box_h = bboxes[0]
+    for x, y, w, h in bboxes[1:]:
+        if x >= box_x and x <= box_x + box_w:
+            if y + h >= box_y and y + h <= box_y + box_h:
+                box = [box_x, min(box_y, y), max(x + w, box_x + box_w) - box_x, box_y + box_h - min(box_y, y)]
+                box_x, box_y, box_w, box_h = box
+                _bboxes[-1] = box
+            elif y >= box_y and y <= box_y + box_h:
+                box = [box_x, box_y, max(x + w, box_x + box_w) - box_x, max(y + h, box_y + box_h) - box_y]
+                box_x, box_y, box_w, box_h = box
+                _bboxes[-1] = box
+            else:
+                # 说明这个box虽然在x方向与目标box有交集 在y方向没有 舍弃
+                pass
+        else:
+            box_x, box_y, box_w, box_h = x, y, w, h
+            _bboxes.append([x, y, w, h])
+    # print(_bboxes)
+    # draw_box(img, _bboxes, title="MSER_CONCAT")
+    if len(_bboxes) > 1:
+        # 只有一个box不需要进行这一步判断
+        bboxes = filter_extreme_box(_bboxes, half_width)
+        # draw_box(img, bboxes, title="MSER_RM_EXTREME")
+    else:
+        bboxes = _bboxes
     xs, ys, ws, hs, _xs, _wh = [], [], [], [], [], []
     _ = [(xs.append(x), ys.append(y), ws.append(x + w), hs.append(y + h), _xs.append([x, x + w]), _wh.append(w / h)) for x, y, w, h in bboxes]
     # if bboxes.__len__() == 1:
@@ -98,7 +130,7 @@ def filter_box(bboxes: np.ndarray, img: np.ndarray, half_width: float):
         max_space = max([_xs[i][0] - _xs[i - 1][1] for i in range(1, _xs.__len__())])
     return bboxes, (xs, ys, ws, hs), max_space
 
-def get_mser(img: np.ndarray, frame_index: int, shape: tuple, min_area=300, isbase: bool = False):
+def get_mser(img: np.ndarray, frame_index: int, shape: tuple, min_area=200, isbase: bool = False):
     height, width, channels = shape # 注意这里的frame是彩色的
     half_width = width / 2
     box_area = 0
@@ -109,12 +141,14 @@ def get_mser(img: np.ndarray, frame_index: int, shape: tuple, min_area=300, isba
     mser = cv2.MSER_create(_min_area=min_area)
     # img = cv2.dilate(img, cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3)))
     regions, bboxes = mser.detectRegions(img)
-    if frame_index == -1:
-        img_bak = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
-        for x, y, w, h in bboxes:
-            cv2.rectangle(img_bak, (x, y), (x + w, y + h), (255, 255, 0), 2)
-        cv2.imshow(f"{frame_index}_img_mser_color", img_bak)
-        cv2.waitKey(0)
+    # if frame_index:
+    #     img_bak = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
+    #     for x, y, w, h in bboxes:
+    #         cv2.rectangle(img_bak, (x, y), (x + w, y + h), (255, 255, 0), 2)
+    #     cv2.imshow(f"{frame_index}_img_mser_color", img_bak)
+        # cv2.waitKey(0)
+    # 给定一个字符最小的高度和宽度 排除比这小的box
+    bboxes = [[x, y, w, h] for x, y, w, h in bboxes if w > 20 and h > 20]
     if bboxes.__len__() == 0:
         print(f"{frame_index} box is zero before filter box")
         return "no subtitle", box_area

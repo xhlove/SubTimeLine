@@ -1,13 +1,14 @@
 '''
 @作者: weimo
 @创建日期: 2020-05-11 20:38:40
-@上次编辑时间: 2020-05-12 03:19:10
+@上次编辑时间: 2020-05-12 17:51:48
 @一个人的命运啊,当然要靠自我奋斗,但是...
 '''
 # 测试互信息计算字幕图像相似度亲情况
 
+import os
 import sys
-sys.path.append(r"C:\Users\weimo\Documents\codes\SubTimeLine")
+sys.path.append(os.getcwd())
 
 import cv2
 import numpy as np
@@ -47,12 +48,17 @@ class MuTualInfoCompare(object):
         
 
 if __name__ == "__main__":
+    cbox = [0, 960, 1920, 60]
+    inrange_params = [0, 180, 0, 15, 180, 244]
+    video_path = Path(r"tests\videos\demo.mp4")
+
     cbox = [0, 610, 1280, 60]
     inrange_params = [0, 180, 0, 28, 210, 255]
     video_path = Path(r"tests\videos\下辈子我再好好过.Raise.de.wa.Chanto.Shimasu.Ep01.Chi_Jap.WEBrip.1280X720-ZhuixinFan.mp4")
+
     MTIC = MuTualInfoCompare(video_path, cbox, inrange_params)
     # MTIC.check([3903, 3989])
     # MTIC.check([32182, 32208])
     # MTIC.check([42062, 42068])
-    MTIC.check([33045, 33045])
+    MTIC.check([33020, 33021])
     cv2.waitKey(0)
