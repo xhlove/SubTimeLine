@@ -1,7 +1,7 @@
 '''
 @作者: weimo
 @创建日期: 2020-03-19 21:51:13
-@上次编辑时间: 2020-05-13 14:32:26
+@上次编辑时间: 2020-05-13 19:27:53
 @一个人的命运啊,当然要靠自我奋斗,但是...
 '''
 
@@ -24,15 +24,18 @@ from util.act import find_subtitle_box
 from logs.logger import get_logger
 
 logger = get_logger(Path(r"logs\subtimeline.log"))
+offset_logger = get_logger(Path(r"logs\offset_range.log"), show=False)
 
 class FWorker(QtCore.QThread):
     progress_frame = QtCore.pyqtSignal(int)
-    def __init__(self, video_path: Path, inrange_params: list, cbox: tuple, offset: int = 0, step: int = 54):
+    def __init__(self, video_path: Path, inrange_params: list, cbox: tuple, offset: int = 0, step: int = 48):
         super(FWorker, self).__init__()
+        self.scale = True
+        self.scale_height = 360
         self.video_path = video_path.absolute()
         self.inrange_params = inrange_params
         self.inrange_params_list = []
-        self.cbox = [int(_ / 2) for _ in cbox]
+        self.cbox = [int(_ / self.scale) for _ in cbox]
         self.offset = offset
         self.step = step
         self.check()
@@ -56,8 +59,16 @@ class FWorker(QtCore.QThread):
             sys.exit(f"Can not open {self.video_path.name} !")
         self.video_frames = self.vc.get(cv2.CAP_PROP_FRAME_COUNT)
         self.video_fps = self.vc.get(cv2.CAP_PROP_FPS)
-        # self.vc.set(cv2.CAP_PROP_FRAME_WIDTH, 720)
-        # self.vc.set(cv2.CAP_PROP_FRAME_HEIGHT, 360)
+        if self.scale:
+            self.scale_ratio = self.scale_height / self.vc.get(cv2.CAP_PROP_FRAME_HEIGHT)
+            self.vw = int(self.vc.get(cv2.CAP_PROP_FRAME_WIDTH) * self.scale_ratio)
+            self.vh = self.scale_height
+        else:
+            self.scale_ratio = 1.0
+            self.vw = self.vc.get(cv2.CAP_PROP_FRAME_WIDTH)
+            self.vh = self.vc.get(cv2.CAP_PROP_FRAME_HEIGHT)
+        self.cbox = [int(_ * self.scale_ratio) for _ in self.cbox]
+        print(self.cbox, "缩放后剪裁区域", self.scale_height, self.scale_ratio, f"{self.vw}x{self.vh}")
 
     def get_inrange_params(self, offset_key: str):
         # 针对单个视频不同时间区域的字幕 提取的设定不一样 注意这里使用的是帧数
@@ -74,7 +85,6 @@ class FWorker(QtCore.QThread):
         if offset < offset_lowwer or offset > offset_upper:
             sys.exit(f"{offset} is out of {offset_lowwer} <-> {offset_upper} !")
         sst = SubStorage()
-        base_frame = None
         offset_end = None
         #<----先找到有字幕的帧---->
         seek_flag = False
@@ -83,24 +93,18 @@ class FWorker(QtCore.QThread):
                 break
             self.vc.set(cv2.CAP_PROP_POS_FRAMES, offset)
             retval, frame = self.vc.read()
-            if retval is False:
-                sys.exit(f"retval is False at {offset} ! exit...")
-            frame = cv2.resize(frame, (640, 360))
+            if self.scale:
+                frame = cv2.resize(frame, (self.vw, self.vh))
             boxes, frame = find_subtitle_box(frame[cut_y:cut_y+cut_h, cut_x:cut_x+cut_w], inrange_params, offset, isbase=True)
             if boxes == "no subtitle":
                 offset += self.step
             else:
                 x, y, w, h = boxes
-                cut_x = cut_x + x
-                cut_y = cut_y + y
-                cut_w = w - x
-                cut_h = h - y
-                cut_area = [cut_x, cut_y, cut_w, cut_h]
-                base_frame = frame[y:h, x:w]
-                sst.base_frame = base_frame
+                cut_area = [cut_x + x, cut_y + y, w - x, h - y]
+                sst.base_frame = frame[y:h, x:w]
                 sst.offset_base = offset
                 sst.stackstorage.update({offset:100.0})
-                print(f"定位{offset}帧 开始寻找")
+                logger.info(f"seek_at    --> {offset:>5} boxes {boxes} cut_area {cut_area}")
                 self.progress_frame.emit(offset)
                 seek_flag = True
             if seek_flag:
@@ -114,12 +118,12 @@ class FWorker(QtCore.QThread):
                 if offset_end - offset_start >= 8:
                     # 间隔太近的不可以认为是一句话
                     pic_save_path = Path(f"subpics/{offset}.jpg")
-                    cv2.imwrite(str(pic_save_path), base_frame)
+                    cv2.imwrite(str(pic_save_path), sst.base_frame)
                     write_ass_line(f"Dialogue: 0,{self.calc_frame_time(offset_start)},{self.calc_frame_time(offset_end)},微软雅黑,,0,0,0,,{offset_start}-{offset_end}")
                 offset = offset_end + 1
                 sst = SubStorage()
                 seek_flag = False
-                cut_x, cut_y, cut_w, cut_h = self.cbox
+                # cut_x, cut_y, cut_w, cut_h = self.cbox
         print(f"耗时{time.time() - ts:.2f}s")
 
     def seek_end(self, offset: int, cut_area: list, sst: SubStorage, ts: float, inrange_params: list):
@@ -131,31 +135,27 @@ class FWorker(QtCore.QThread):
                 break
             self.vc.set(cv2.CAP_PROP_POS_FRAMES, offset)
             retval, frame = self.vc.read()
-            _frame = frame
-            if retval is False:
-                sys.exit(f"retval is False at {offset} ! exit...")
-            frame = cv2.resize(frame, (640, 360))
-            boxes, frame = find_subtitle_box(frame[cut_y:cut_y+cut_h, cut_x:cut_x+cut_w], inrange_params, offset)
-            _sm_frame = frame & sst.base_frame
-            sh, sw = _sm_frame.shape
-            sh = int(sh / 2)
-            similarity = mr.normalized_mutual_info_score(_sm_frame[sh-1:sh+1, :].reshape(-1), sst.base_frame[sh-1:sh+1, :].reshape(-1)) * 100
+            if self.scale:
+                frame = cv2.resize(frame, (self.vw, self.vh))
+            _, frame = find_subtitle_box(frame[cut_y:cut_y+cut_h, cut_x:cut_x+cut_w], inrange_params, offset, dopre=True)
+            frame = frame & sst.base_frame
+            similarity = mr.normalized_mutual_info_score(frame.reshape(-1), sst.base_frame.reshape(-1)) * 100
             
             sst.stackstorage.update({offset:similarity})
             sst.sort_stack()
             offset_index_in_stack = list(sst.stackstorage.keys())[list(sst.stackstorage.keys()).index(offset)]
             left_key = offset_index_in_stack - 1
             right_key = offset_index_in_stack + 1
-            logger.info(f"seek_end --> {offset} {similarity:.2f},left_key {left_key} right_key {right_key}")
-            if similarity >= 85:
-                sst.base_frame = _sm_frame
+            logger.info(f"seek_end   --> {offset:>5} {similarity:.2f} left_key {left_key} right_key {right_key}")
+            if similarity >= 90:
+                sst.base_frame = frame
             if similarity >= self.similarity_threshold:
-                if boxes == "no subtitle":
-                    print(f"{offset} {sst.offset_base} 警告！匹配判断与直接判断冲突")
+                # if boxes == "no subtitle":
+                #     print(f"{offset} {sst.offset_base} 警告！匹配判断与直接判断冲突")
                 stack_flag = False # sst.stackstorage.get(right_key) 当similarity为0.0这里布尔值是False 后面优化一下 目前将0.0设定到0.01
                 if sst.stackstorage.get(right_key) is not None and sst.stackstorage[right_key] < self.similarity_threshold:
                     sst.offset_end = offset
-                    print(f"{offset}是{sst.offset_base}的末尾帧 √√×")
+                    offset_logger.info(f"{offset} 是 {sst.offset_base} 的末尾帧 √√×")
                     find_offset_end = True
                     break
                 else:
@@ -172,7 +172,7 @@ class FWorker(QtCore.QThread):
                 stack_flag = False
                 if sst.stackstorage.get(left_key) is not None and sst.stackstorage[left_key] >= self.similarity_threshold:
                     sst.offset_end = left_key
-                    print(f"{left_key}是{sst.offset_base}的末尾帧 √××")
+                    offset_logger.info(f"{left_key} 是 {sst.offset_base} 的末尾帧 √××")
                     find_offset_end = True
                     break
                 else:
@@ -196,34 +196,30 @@ class FWorker(QtCore.QThread):
             #<----read frame and get mser boxes---->
             self.vc.set(cv2.CAP_PROP_POS_FRAMES, offset)
             retval, frame = self.vc.read()
-            _frame = frame
-            if retval is False:
-                sys.exit(f"retval is False at {offset} ! exit...")
-            frame = cv2.resize(frame, (640, 360))
-            boxes, frame = find_subtitle_box(frame[cut_y:cut_y+cut_h, cut_x:cut_x+cut_w], inrange_params, offset)
-            _sm_frame = frame & sst.base_frame
-            sh, sw = _sm_frame.shape
-            sh = int(sh / 2)
-            similarity = mr.normalized_mutual_info_score(_sm_frame[sh-1:sh+1, :].reshape(-1), sst.base_frame[sh-1:sh+1, :].reshape(-1)) * 100
-            logger.info(f"seek_start --> {offset} {similarity:.2f}")
+            if self.scale:
+                frame = cv2.resize(frame, (self.vw, self.vh))
+            _, frame = find_subtitle_box(frame[cut_y:cut_y+cut_h, cut_x:cut_x+cut_w], inrange_params, offset, dopre=True)
+            frame = frame & sst.base_frame
+            similarity = mr.normalized_mutual_info_score(frame.reshape(-1), sst.base_frame.reshape(-1)) * 100
             sst.stackstorage.update({offset:similarity})
             sst.sort_stack()
             offset_index_in_stack = list(sst.stackstorage.keys())[list(sst.stackstorage.keys()).index(offset)]
             left_key = offset_index_in_stack - 1
             right_key = offset_index_in_stack + 1
+            logger.info(f"seek_start --> {offset:>5} {similarity:.2f} left_key {left_key} right_key {right_key}")
             #<------进行判断 寻找下一个位置或得到最终结果------>
-            if similarity >= 85:
+            if similarity >= 90:
                 # 修正base_frame
-                sst.base_frame = _sm_frame
+                sst.base_frame = frame
             #<----增加一个面积的辅助判断---->
             if similarity >= self.similarity_threshold:
-                if boxes == "no subtitle":
-                    print(f"{offset} {sst.offset_base} 警告！匹配判断与直接判断冲突")
+                # if boxes == "no subtitle":
+                #     print(f"{offset} {sst.offset_base} 警告！匹配判断与直接判断冲突")
                 # 当前帧和base_frame同一字幕 而左侧不是同一字幕 那说明这里是起始帧
                 stack_flag = False
                 if sst.stackstorage.get(left_key) is not None and sst.stackstorage[left_key] < self.similarity_threshold:
                     sst.offset_start = offset
-                    print(f"{offset}是{sst.offset_base}的起始帧 ×√√")
+                    offset_logger.info(f"{offset} 是 {sst.offset_base} 的起始帧 ×√√")
                     find_offset_start = True
                     break
                 else:
@@ -242,7 +238,7 @@ class FWorker(QtCore.QThread):
                 stack_flag = False
                 if sst.stackstorage.get(right_key) is not None and sst.stackstorage[right_key] >= self.similarity_threshold:
                     sst.offset_start = right_key
-                    print(f"{right_key}是{sst.offset_base}的起始帧 ××√")
+                    offset_logger.info(f"{right_key} 是 {sst.offset_base} 的起始帧 ××√")
                     find_offset_start = True
                     break
                 else:
@@ -259,22 +255,8 @@ class FWorker(QtCore.QThread):
         # print(f"耗时统计 -> {abs(sst.offset_base - offset_init)}帧 {time.time() - ts:.2f}s")
         # cv2.waitKey(0)
 
-def get_params(video_path: Path, offset: int, cbox: list, inrange_params: list = None):
-    from util.inrange import only_subtitle, get_canny
-    vc = cv2.VideoCapture(str(video_path))
-    if vc.isOpened() is False:
-        sys.exit(f"Can not open {video_path.name} !")
-    vc.set(cv2.CAP_PROP_POS_FRAMES, offset)
-    retval, frame = vc.read()
-    x, y, w, h = cbox
-    # img = get_canny(frame[y:y+h, x:x+w])
-    img = only_subtitle(frame[y:y+h, x:x+w], inrange_params=inrange_params, just_return=False)
-
 if __name__ == "__main__":
-    # work()
     video_path = Path(r"tests\videos\demo.mp4")
-    # get_params(video_path, 15337, [0, 960, 1920, 60], inrange_params=[0, 190, 0, 50, 220, 244])
-    # get_params(video_path, 6345, [0, 960, 1920, 60], inrange_params=[0, 180, 0, 15, 180, 244])
     inrange_params = {
         "0:25300": [0, 190, 0, 30, 180, 255],
         # "2530:30038": [0, 190, 0, 50, 220, 244],

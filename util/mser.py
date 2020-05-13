@@ -1,7 +1,7 @@
 '''
 @作者: weimo
 @创建日期: 2020-03-26 19:17:52
-@上次编辑时间: 2020-05-13 14:09:17
+@上次编辑时间: 2020-05-13 19:48:29
 @一个人的命运啊,当然要靠自我奋斗,但是...
 '''
 import cv2
@@ -17,6 +17,7 @@ MIN_SPACE = 300
 MAX_HEIGHT = 60
 
 def draw_box(img: np.ndarray, bboxes: list, title="+_+"):
+    print(bboxes)
     img_bak = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
     for x, y, w, h in bboxes:
         cv2.rectangle(img_bak, (x, y), (x + w, y + h), (255, 255, 0), 2)
@@ -135,13 +136,14 @@ def filter_box(bboxes: np.ndarray, img: np.ndarray, half_width: float):
 def get_mser(img: np.ndarray, frame_index: int, shape: tuple, min_area=100, isbase: bool = False):
     height, width, channels = shape # 注意这里的frame是彩色的
     half_width = width / 2
-
+    # print(height, width)
     mser = cv2.MSER_create(_min_area=min_area)
     img = cv2.dilate(img, cv2.getStructuringElement(cv2.MORPH_RECT, (4, 4)))
     regions, bboxes = mser.detectRegions(img)
-    # draw_box(img.copy(), bboxes)
+    
     # 给定一个字符最小的高度和宽度 排除比这小的box
-    bboxes = [[x, y, w, h] for x, y, w, h in bboxes if w > 10 and h > 10]
+    bboxes = [[x, y, w, h] for x, y, w, h in bboxes if w > 10 and h > 10 and (w * h) / (width * height) < 0.8]
+    draw_box(img.copy(), bboxes)
     if bboxes.__len__() == 0:
         print(f"{frame_index} box is zero before filter box")
         return "no subtitle"

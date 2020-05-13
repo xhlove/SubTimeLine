@@ -1,7 +1,7 @@
 '''
 @作者: weimo
 @创建日期: 2020-05-11 18:55:08
-@上次编辑时间: 2020-05-13 14:02:18
+@上次编辑时间: 2020-05-13 18:48:23
 @一个人的命运啊,当然要靠自我奋斗,但是...
 '''
 
@@ -40,9 +40,11 @@ def pre_get_mser(frame: np.ndarray, inrange_params: tuple, gaus: int = 0, rm_can
     else:
         return frame_inrange_without_white
 
-def find_subtitle_box(frame: np.ndarray, params: tuple, frame_index: int, isbase: bool = False):
+def find_subtitle_box(frame: np.ndarray, params: tuple, frame_index: int, isbase: bool = False, dopre: bool = False):
     frame_subtitle = pre_get_mser(frame, params)
     # cv2.imshow("frame_subtitle_pre_get_mser", frame_subtitle)
     # cv2.waitKey(0)
-    box = get_mser(frame_subtitle, frame_index, frame.shape, isbase=isbase)
+    box = None
+    if dopre is False:
+        box = get_mser(frame_subtitle, frame_index, frame.shape, isbase=isbase)
     return box, frame_subtitle
