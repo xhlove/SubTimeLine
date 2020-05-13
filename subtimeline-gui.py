@@ -1,7 +1,7 @@
 '''
 @作者: weimo
 @创建日期: 2020-03-31 13:20:26
-@上次编辑时间: 2020-05-13 11:32:37
+@上次编辑时间: 2020-05-13 14:10:24
 @一个人的命运啊,当然要靠自我奋斗,但是...
 '''
 import os
@@ -192,7 +192,7 @@ class GUI(QtWidgets.QMainWindow):
     @QtCore.pyqtSlot(int)
     def goto_subtitle_frame(self, frame_index: int):
         self.timeslider.setValue(frame_index)
-        self.select_frame(show_sub_inrange=True)
+        # self.select_frame(show_sub_inrange=True)
 
     def do_work(self):
         inrange_params = self.save_inrange_params()

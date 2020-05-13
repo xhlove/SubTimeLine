@@ -1,7 +1,7 @@
 '''
 @作者: weimo
 @创建日期: 2020-03-26 19:17:52
-@上次编辑时间: 2020-05-13 12:05:48
+@上次编辑时间: 2020-05-13 14:09:17
 @一个人的命运啊,当然要靠自我奋斗,但是...
 '''
 import cv2
@@ -132,15 +132,16 @@ def filter_box(bboxes: np.ndarray, img: np.ndarray, half_width: float):
         max_space = max([_xs[i][0] - _xs[i - 1][1] for i in range(1, _xs.__len__())])
     return bboxes, (xs, ys, ws, hs), max_space
 
-def get_mser(img: np.ndarray, frame_index: int, shape: tuple, min_area=200, isbase: bool = False):
+def get_mser(img: np.ndarray, frame_index: int, shape: tuple, min_area=100, isbase: bool = False):
     height, width, channels = shape # 注意这里的frame是彩色的
     half_width = width / 2
 
     mser = cv2.MSER_create(_min_area=min_area)
-    # img = cv2.dilate(img, cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3)))
+    img = cv2.dilate(img, cv2.getStructuringElement(cv2.MORPH_RECT, (4, 4)))
     regions, bboxes = mser.detectRegions(img)
+    # draw_box(img.copy(), bboxes)
     # 给定一个字符最小的高度和宽度 排除比这小的box
-    bboxes = [[x, y, w, h] for x, y, w, h in bboxes if w > 20 and h > 20]
+    bboxes = [[x, y, w, h] for x, y, w, h in bboxes if w > 10 and h > 10]
     if bboxes.__len__() == 0:
         print(f"{frame_index} box is zero before filter box")
         return "no subtitle"

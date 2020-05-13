@@ -1,7 +1,7 @@
 '''
 @作者: weimo
 @创建日期: 2020-03-19 21:51:13
-@上次编辑时间: 2020-05-13 12:00:13
+@上次编辑时间: 2020-05-13 14:32:26
 @一个人的命运啊,当然要靠自我奋斗,但是...
 '''
 
@@ -27,12 +27,12 @@ logger = get_logger(Path(r"logs\subtimeline.log"))
 
 class FWorker(QtCore.QThread):
     progress_frame = QtCore.pyqtSignal(int)
-    def __init__(self, video_path: Path, inrange_params: list, cbox: tuple, offset: int = 0, step: int = 48):
+    def __init__(self, video_path: Path, inrange_params: list, cbox: tuple, offset: int = 0, step: int = 54):
         super(FWorker, self).__init__()
         self.video_path = video_path.absolute()
         self.inrange_params = inrange_params
         self.inrange_params_list = []
-        self.cbox = cbox
+        self.cbox = [int(_ / 2) for _ in cbox]
         self.offset = offset
         self.step = step
         self.check()
@@ -56,6 +56,8 @@ class FWorker(QtCore.QThread):
             sys.exit(f"Can not open {self.video_path.name} !")
         self.video_frames = self.vc.get(cv2.CAP_PROP_FRAME_COUNT)
         self.video_fps = self.vc.get(cv2.CAP_PROP_FPS)
+        # self.vc.set(cv2.CAP_PROP_FRAME_WIDTH, 720)
+        # self.vc.set(cv2.CAP_PROP_FRAME_HEIGHT, 360)
 
     def get_inrange_params(self, offset_key: str):
         # 针对单个视频不同时间区域的字幕 提取的设定不一样 注意这里使用的是帧数
@@ -83,6 +85,7 @@ class FWorker(QtCore.QThread):
             retval, frame = self.vc.read()
             if retval is False:
                 sys.exit(f"retval is False at {offset} ! exit...")
+            frame = cv2.resize(frame, (640, 360))
             boxes, frame = find_subtitle_box(frame[cut_y:cut_y+cut_h, cut_x:cut_x+cut_w], inrange_params, offset, isbase=True)
             if boxes == "no subtitle":
                 offset += self.step
@@ -131,9 +134,12 @@ class FWorker(QtCore.QThread):
             _frame = frame
             if retval is False:
                 sys.exit(f"retval is False at {offset} ! exit...")
+            frame = cv2.resize(frame, (640, 360))
             boxes, frame = find_subtitle_box(frame[cut_y:cut_y+cut_h, cut_x:cut_x+cut_w], inrange_params, offset)
             _sm_frame = frame & sst.base_frame
-            similarity = mr.normalized_mutual_info_score(_sm_frame.reshape(-1), sst.base_frame.reshape(-1)) * 100
+            sh, sw = _sm_frame.shape
+            sh = int(sh / 2)
+            similarity = mr.normalized_mutual_info_score(_sm_frame[sh-1:sh+1, :].reshape(-1), sst.base_frame[sh-1:sh+1, :].reshape(-1)) * 100
             
             sst.stackstorage.update({offset:similarity})
             sst.sort_stack()
@@ -193,9 +199,12 @@ class FWorker(QtCore.QThread):
             _frame = frame
             if retval is False:
                 sys.exit(f"retval is False at {offset} ! exit...")
+            frame = cv2.resize(frame, (640, 360))
             boxes, frame = find_subtitle_box(frame[cut_y:cut_y+cut_h, cut_x:cut_x+cut_w], inrange_params, offset)
             _sm_frame = frame & sst.base_frame
-            similarity = mr.normalized_mutual_info_score(_sm_frame.reshape(-1), sst.base_frame.reshape(-1)) * 100
+            sh, sw = _sm_frame.shape
+            sh = int(sh / 2)
+            similarity = mr.normalized_mutual_info_score(_sm_frame[sh-1:sh+1, :].reshape(-1), sst.base_frame[sh-1:sh+1, :].reshape(-1)) * 100
             logger.info(f"seek_start --> {offset} {similarity:.2f}")
             sst.stackstorage.update({offset:similarity})
             sst.sort_stack()
