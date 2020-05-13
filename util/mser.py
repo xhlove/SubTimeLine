@@ -1,11 +1,17 @@
 '''
 @作者: weimo
 @创建日期: 2020-03-26 19:17:52
-@上次编辑时间: 2020-05-12 16:53:24
+@上次编辑时间: 2020-05-13 12:05:48
 @一个人的命运啊,当然要靠自我奋斗,但是...
 '''
 import cv2
 import numpy as np
+from pathlib import Path
+
+from util.calc import get_white_ratio
+from logs.logger import get_logger
+
+ratio_logger = get_logger(Path(r"logs\frame_white_ratio.log"))
 
 MIN_SPACE = 300
 MAX_HEIGHT = 60
@@ -98,10 +104,6 @@ def filter_box(bboxes: np.ndarray, img: np.ndarray, half_width: float):
         bboxes = _bboxes
     xs, ys, ws, hs, _xs, _wh = [], [], [], [], [], []
     _ = [(xs.append(x), ys.append(y), ws.append(x + w), hs.append(y + h), _xs.append([x, x + w]), _wh.append(w / h)) for x, y, w, h in bboxes]
-    # if bboxes.__len__() == 1:
-    #     max_space = 0 # 在前面处理不会把一些box漏掉 虽然这些box可能比较小
-    # else:
-    #     max_space = max([_xs[i][0] - _xs[i - 1][1] for i in range(1, _xs.__len__())])
     # 对称性判断 有的字幕不一定对称 暂时不加这个
     data_distances = [(((x + w) / 2) - half_width) / half_width for x, w in zip(xs, ws)]
     if data_distances.__len__() > 2:
@@ -133,52 +135,39 @@ def filter_box(bboxes: np.ndarray, img: np.ndarray, half_width: float):
 def get_mser(img: np.ndarray, frame_index: int, shape: tuple, min_area=200, isbase: bool = False):
     height, width, channels = shape # 注意这里的frame是彩色的
     half_width = width / 2
-    box_area = 0
-
-    # 在MSER之前有必要计算白色区域占比 以排除一些虽然会找到box却不是字幕的帧 例如背景有白色规则物体时
-    # dict(zip(*np.unique(frame_subtitle[y:h, x:w], return_counts=True)))
 
     mser = cv2.MSER_create(_min_area=min_area)
     # img = cv2.dilate(img, cv2.getStructuringElement(cv2.MORPH_RECT, (3, 3)))
     regions, bboxes = mser.detectRegions(img)
-    # if frame_index:
-    #     img_bak = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
-    #     for x, y, w, h in bboxes:
-    #         cv2.rectangle(img_bak, (x, y), (x + w, y + h), (255, 255, 0), 2)
-    #     cv2.imshow(f"{frame_index}_img_mser_color", img_bak)
-        # cv2.waitKey(0)
     # 给定一个字符最小的高度和宽度 排除比这小的box
     bboxes = [[x, y, w, h] for x, y, w, h in bboxes if w > 20 and h > 20]
     if bboxes.__len__() == 0:
         print(f"{frame_index} box is zero before filter box")
-        return "no subtitle", box_area
+        return "no subtitle"
     bboxes, (xs, ys, ws, hs), max_space = filter_box(bboxes, img.copy(), half_width)
     if bboxes.__len__() == 0:
         print(f"{frame_index} box is zero after filter box")
-        return "no subtitle", box_area
+        return "no subtitle"
     elif bboxes.__len__() == 1:
         if min(xs) < half_width and max(ws) > half_width:
             pass
         else:
             print(f"{frame_index} bboxes 不居中")
-            return "no subtitle", box_area
+            return "no subtitle"
     elif bboxes.__len__() > 1 and max_space > MIN_SPACE:
         print(f"{frame_index} 间隔太远 不符合字幕的特征 {max_space} {xs} {ws}")
-        return "no subtitle", box_area
+        return "no subtitle"
     # 高度占比过低 不符合字幕特征
     if (max(hs) - min(ys)) / MAX_HEIGHT < 0.2:
         print(f"{frame_index} 高度占比过低 不符合字幕特征")
-        return "no subtitle", box_area
-    box_area = (max(ws) - min(xs)) * (max(hs) - min(ys))
+        return "no subtitle"
     if isbase and min(xs) - 5 > 0 and min(ys) - 5 > 0 and max(ws) + 5 < width and max(hs) + 5 < height:
         x, y, w, h = min(xs) - 5, min(ys) - 5, max(ws) + 5, max(hs) + 5
     else:
         x, y, w, h = min(xs), min(ys), max(ws), max(hs)
-    # img_bak = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
-    # for _x, _y, _w, _h in bboxes:
-    #     cv2.rectangle(img_bak, (_x, _y), (_x + _w, _y + _h), (255, 255, 0), 2)
-    # cv2.rectangle(img_bak, (x, y), (w, h), (0, 255, 255), 2)
-    # cv2.imshow(f"{frame_index}_img_mser_color", img_bak)
-    # cv2.waitKey(0)
+    white_ratio = get_white_ratio(img[y:h, x:w])
+    ratio_logger.info(f"{frame_index:>5} {white_ratio:>5.2f}")
+    if white_ratio < 0.2:
+        return "no subtitle"
     # 注意这里返回的w和h已经是实际坐标了
-    return (x, y, w, h), box_area
+    return x, y, w, h

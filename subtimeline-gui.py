@@ -1,7 +1,7 @@
 '''
 @作者: weimo
 @创建日期: 2020-03-31 13:20:26
-@上次编辑时间: 2020-05-11 18:51:47
+@上次编辑时间: 2020-05-13 11:32:37
 @一个人的命运啊,当然要靠自我奋斗,但是...
 '''
 import os
@@ -20,7 +20,7 @@ from ui.dropfile import DropEnable
 from util.inrange import convert_img_hsv_with_inrange
 from util.transfer import load_config as load_inrange_config, save_custom_inrange_params
 
-from subtimeline import Worker
+from subtimeline import FWorker
 
 ALLOW_VIDEO_SUFFIXS = ["mkv", "mp4", "flv", "ts"]
 
@@ -196,7 +196,7 @@ class GUI(QtWidgets.QMainWindow):
 
     def do_work(self):
         inrange_params = self.save_inrange_params()
-        self.worker = Worker(self.video_path, {f"0:{self.timeslider.maximum()}": inrange_params}, self.frame_stack.cbox)
+        self.worker = FWorker(self.video_path, {f"0:{self.timeslider.maximum()}": inrange_params}, self.frame_stack.cbox)
         self.worker.inrange_params_list = inrange_params
         self.worker.progress_frame.connect(self.goto_subtitle_frame)
         self.timeslider.show_frame.disconnect(self.select_frame)

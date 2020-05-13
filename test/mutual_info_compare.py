@@ -1,7 +1,7 @@
 '''
 @作者: weimo
 @创建日期: 2020-05-11 20:38:40
-@上次编辑时间: 2020-05-12 17:51:48
+@上次编辑时间: 2020-05-13 11:14:25
 @一个人的命运啊,当然要靠自我奋斗,但是...
 '''
 # 测试互信息计算字幕图像相似度亲情况
@@ -29,7 +29,7 @@ class MuTualInfoCompare(object):
         cut_x, cut_y, cut_w, cut_h = self.cbox
         self.vc.set(cv2.CAP_PROP_POS_FRAMES, offset)
         retval, frame = self.vc.read()
-        boxes, box_area, frame = find_subtitle_box(frame[cut_y:cut_y+cut_h, cut_x:cut_x+cut_w], self.inrange_params, offset, isbase=False)
+        boxes, frame = find_subtitle_box(frame[cut_y:cut_y+cut_h, cut_x:cut_x+cut_w], self.inrange_params, offset, isbase=False)
         print(boxes)
         return frame, boxes#[12:59, 418-20:863+20]
 
